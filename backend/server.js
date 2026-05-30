@@ -7,11 +7,9 @@ dotenv.config();
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// DB Connection
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
@@ -24,7 +22,10 @@ const connectDB = async () => {
 
 connectDB();
 
-// Routes (later add cheyuvom)
+// Routes — idha add pannunga
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authRoutes);
+
 app.get('/', (req, res) => {
   res.json({ message: 'SmartHire AI Backend running!' });
 });

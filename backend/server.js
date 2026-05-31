@@ -2,13 +2,20 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
+const fs = require('fs');
 
 dotenv.config();
-
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Uploads folder auto-create
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
 
 const connectDB = async () => {
   try {
@@ -19,12 +26,14 @@ const connectDB = async () => {
     process.exit(1);
   }
 };
-
 connectDB();
 
-// Routes — idha add pannunga
+// Routes
 const authRoutes = require('./routes/authRoutes');
+const resumeRoutes = require('./routes/resumeRoutes');
+
 app.use('/api/auth', authRoutes);
+app.use('/api/resume', resumeRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'SmartHire AI Backend running!' });

@@ -31,7 +31,8 @@ connectDB();
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const resumeRoutes = require('./routes/resumeRoutes');
-
+const interviewRoutes = require('./routes/interviewRoutes');
+app.use('/api/interview', interviewRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/resume', resumeRoutes);
 

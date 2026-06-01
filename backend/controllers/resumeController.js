@@ -1,5 +1,5 @@
 const Resume = require('../models/Resume');
-const pdfParse = require('pdf-parse');
+const pdfParse = require('pdf-parse/lib/pdf-parse.js');
 const fs = require('fs');
 const path = require('path');
 

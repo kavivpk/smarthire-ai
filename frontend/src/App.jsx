@@ -3,6 +3,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ResumeAnalyzer from './pages/ResumeAnalyzer';
+import MockInterview from './pages/MockInterview';
+import PlacementPrediction from './pages/PlacementPrediction';
+import CareerRoadmap from "./pages/CareerRoadmap";
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -22,6 +25,14 @@ export default function App() {
         <Route path="/resume" element={
           <ProtectedRoute><ResumeAnalyzer /></ProtectedRoute>
         } />
+        <Route path="/interview" element={
+          <ProtectedRoute><MockInterview /></ProtectedRoute>
+        } />
+        <Route path="/prediction" element={
+          <ProtectedRoute><PlacementPrediction /></ProtectedRoute>
+        } />
+        <Route path="/career-roadmap" element={<CareerRoadmap />} />
+
       </Routes>
     </BrowserRouter>
   );

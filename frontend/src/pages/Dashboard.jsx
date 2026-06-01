@@ -28,7 +28,7 @@ const features = [
     desc: 'Technical + HR Questions',
     phase: 'Phase 2',
     accent: '#a855f7',
-    path: null,
+    path: '/interview',
   },
   {
     symbol: (
@@ -42,7 +42,7 @@ const features = [
     desc: 'ML-based probability',
     phase: 'Phase 3',
     accent: '#22c55e',
-    path: null,
+      path: '/prediction',
   },
   {
     symbol: (
@@ -84,6 +84,13 @@ const features = [
     accent: '#14b8a6',
     path: null,
   },
+  {
+  title: "Career Roadmap",
+  description: "Skill gap analysis & personalized 8-week learning plan",
+  icon: "🗺️",
+  path: "/career-roadmap",
+  color: "from-indigo-500 to-purple-600"
+}
 ];
 
 export default function Dashboard() {
@@ -117,7 +124,7 @@ export default function Dashboard() {
 
       <div className="max-w-5xl mx-auto p-6">
 
-        {/* Welcome */}
+        {/* Welcome card */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-6 transition-colors">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">
             Welcome back, {user.name}! 👋
@@ -137,25 +144,32 @@ export default function Dashboard() {
             <div
               key={i}
               onClick={() => f.path && navigate(f.path)}
-              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 transition-all duration-200 group"
+              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 transition-all duration-200"
               style={{
                 borderTop: `3px solid ${f.accent}`,
                 cursor: f.path ? 'pointer' : 'default',
-                opacity: f.path ? 1 : 0.7,
+                opacity: f.path ? 1 : 0.6,
               }}
             >
+              {/* Icon */}
               <div
                 className="mb-4 w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{ backgroundColor: `${f.accent}18` }}
               >
                 {f.symbol}
               </div>
+
+              {/* Title */}
               <h3 className="font-semibold text-gray-900 dark:text-white mb-1 text-sm">
                 {f.title}
               </h3>
+
+              {/* Desc */}
               <p className="text-gray-500 dark:text-gray-400 text-xs mb-3">
                 {f.desc}
               </p>
+
+              {/* Phase + status */}
               <div className="flex items-center justify-between">
                 <span
                   className="text-xs px-2 py-1 rounded-md font-medium"
@@ -163,12 +177,11 @@ export default function Dashboard() {
                 >
                   {f.phase}
                 </span>
-                {f.path && (
+                {f.path ? (
                   <span className="text-xs text-gray-400 dark:text-gray-500">
                     Open →
                   </span>
-                )}
-                {!f.path && (
+                ) : (
                   <span className="text-xs text-gray-400 dark:text-gray-500">
                     Coming soon
                   </span>

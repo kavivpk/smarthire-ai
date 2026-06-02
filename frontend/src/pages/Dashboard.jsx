@@ -82,6 +82,13 @@ const features = [
     accent: '#f59e0b',
     path: '/career-roadmap',
   },
+  {
+  title: "Admin Dashboard",
+  description: "Student analytics, charts & platform statistics",
+  icon: "🛡️",
+  path: "/admin",
+  color: "from-red-500 to-pink-600"
+},
 ];
 
 export default function Dashboard() {

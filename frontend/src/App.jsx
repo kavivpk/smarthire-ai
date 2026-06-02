@@ -8,6 +8,7 @@ import PlacementPrediction from './pages/PlacementPrediction';
 import CareerRoadmap from './pages/CareerRoadmap';
 import FakeSkillDetection from './pages/FakeSkillDetection';
 import Layout from './components/Layout';
+import AdminDashboard from "./pages/AdminDashboard";
 
 const ProtectedLayout = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -39,7 +40,10 @@ export default function App() {
         <Route path="/fakeskill" element={
           <ProtectedLayout><FakeSkillDetection /></ProtectedLayout>
         } />
+              <Route path="/admin" element={<AdminDashboard />} />
+
       </Routes>
+
     </BrowserRouter>
   );
 }

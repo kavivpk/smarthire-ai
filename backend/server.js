@@ -32,9 +32,12 @@ connectDB();
 const authRoutes = require('./routes/authRoutes');
 const resumeRoutes = require('./routes/resumeRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
+const adminRoutes = require("./routes/adminRoutes");
+
 app.use('/api/interview', interviewRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/resume', resumeRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'SmartHire AI Backend running!' });

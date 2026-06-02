@@ -1,10 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
-import ThemeToggle from '../components/ThemeToggle';
 
 export default function ResumeAnalyzer() {
-  const navigate = useNavigate();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -52,20 +49,6 @@ export default function ResumeAnalyzer() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-
-      {/* Navbar */}
-      <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
-            ← Back
-          </button>
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-            Resume <span className="text-blue-500">Analyzer</span>
-          </h1>
-        </div>
-        <ThemeToggle />
-      </nav>
 
       <div className="max-w-3xl mx-auto p-6">
 

@@ -1,6 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import ThemeToggle from '../components/ThemeToggle';
-
 const features = [
   {
     symbol: (
@@ -46,19 +44,6 @@ const features = [
   },
   {
     symbol: (
-      <svg width="28" height="28" fill="none" stroke="#f59e0b" strokeWidth="1.8" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10"/>
-        <polyline points="12 6 12 12 16 14"/>
-      </svg>
-    ),
-    title: 'Career Roadmap',
-    desc: 'Personalized learning path',
-    phase: 'Phase 3',
-    accent: '#f59e0b',
-    path: null,
-  },
-  {
-    symbol: (
       <svg width="28" height="28" fill="none" stroke="#ef4444" strokeWidth="1.8" viewBox="0 0 24 24">
         <circle cx="11" cy="11" r="8"/>
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -70,7 +55,7 @@ const features = [
     desc: 'Fake skill warning',
     phase: 'Phase 3',
     accent: '#ef4444',
-    path: null,
+    path: '/fakeskill',
   },
   {
     symbol: (
@@ -85,42 +70,29 @@ const features = [
     path: null,
   },
   {
-  title: "Career Roadmap",
-  description: "Skill gap analysis & personalized 8-week learning plan",
-  icon: "🗺️",
-  path: "/career-roadmap",
-  color: "from-indigo-500 to-purple-600"
-}
+    symbol: (
+      <svg width="28" height="28" fill="none" stroke="#f59e0b" strokeWidth="1.8" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+    ),
+    title: 'Career Roadmap',
+    desc: 'Personalized learning path',
+    phase: 'Phase 3',
+    accent: '#f59e0b',
+    path: '/career-roadmap',
+  },
 ];
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
 
-      {/* Navbar */}
-      <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex justify-between items-center transition-colors">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-          SmartHire <span className="text-blue-500">AI</span>
-        </h1>
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <button
-            onClick={handleLogout}
-            className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg text-sm transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
+     
 
       <div className="max-w-5xl mx-auto p-6">
 

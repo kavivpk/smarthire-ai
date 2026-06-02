@@ -5,11 +5,13 @@ import Dashboard from './pages/Dashboard';
 import ResumeAnalyzer from './pages/ResumeAnalyzer';
 import MockInterview from './pages/MockInterview';
 import PlacementPrediction from './pages/PlacementPrediction';
-import CareerRoadmap from "./pages/CareerRoadmap";
+import CareerRoadmap from './pages/CareerRoadmap';
+import FakeSkillDetection from './pages/FakeSkillDetection';
+import Layout from './components/Layout';
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedLayout = ({ children }) => {
   const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" />;
+  return token ? <Layout>{children}</Layout> : <Navigate to="/login" />;
 };
 
 export default function App() {
@@ -20,19 +22,23 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={
-          <ProtectedRoute><Dashboard /></ProtectedRoute>
+          <ProtectedLayout><Dashboard /></ProtectedLayout>
         } />
         <Route path="/resume" element={
-          <ProtectedRoute><ResumeAnalyzer /></ProtectedRoute>
+          <ProtectedLayout><ResumeAnalyzer /></ProtectedLayout>
         } />
         <Route path="/interview" element={
-          <ProtectedRoute><MockInterview /></ProtectedRoute>
+          <ProtectedLayout><MockInterview /></ProtectedLayout>
         } />
         <Route path="/prediction" element={
-          <ProtectedRoute><PlacementPrediction /></ProtectedRoute>
+          <ProtectedLayout><PlacementPrediction /></ProtectedLayout>
         } />
-        <Route path="/career-roadmap" element={<CareerRoadmap />} />
-
+        <Route path="/career-roadmap" element={
+          <ProtectedLayout><CareerRoadmap /></ProtectedLayout>
+        } />
+        <Route path="/fakeskill" element={
+          <ProtectedLayout><FakeSkillDetection /></ProtectedLayout>
+        } />
       </Routes>
     </BrowserRouter>
   );

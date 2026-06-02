@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ThemeToggle from '../components/ThemeToggle';
 
 const SKILLS_LIST = [
   'JavaScript', 'Python', 'Java', 'React', 'Node.js',
@@ -9,7 +7,6 @@ const SKILLS_LIST = [
 ];
 
 export default function PlacementPrediction() {
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     cgpa: '',
     skills: [],
@@ -74,20 +71,6 @@ export default function PlacementPrediction() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-
-      {/* Navbar */}
-      <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white text-sm transition-colors">
-            ← Back
-          </button>
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-            Placement <span className="text-green-500">Prediction</span>
-          </h1>
-        </div>
-        <ThemeToggle />
-      </nav>
 
       <div className="max-w-5xl mx-auto p-6">
 

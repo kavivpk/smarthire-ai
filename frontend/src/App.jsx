@@ -9,6 +9,7 @@ import CareerRoadmap from './pages/CareerRoadmap';
 import FakeSkillDetection from './pages/FakeSkillDetection';
 import Layout from './components/Layout';
 import AdminDashboard from "./pages/AdminDashboard";
+import LiveInterview from "./pages/LiveInterview";
 
 const ProtectedLayout = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -41,7 +42,9 @@ export default function App() {
           <ProtectedLayout><FakeSkillDetection /></ProtectedLayout>
         } />
               <Route path="/admin" element={<AdminDashboard />} />
-
+<Route path="/live-interview" element={
+  <ProtectedLayout><LiveInterview /></ProtectedLayout>
+} />
       </Routes>
 
     </BrowserRouter>

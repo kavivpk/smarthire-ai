@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import API from '../services/api';
+import { AI_SERVICE_URL } from '../config/apiConfig';
 
 const TOPICS = [
   { id: 'javascript', label: 'JavaScript', color: '#f7df1e', bg: '#f7df1e20' },
@@ -54,7 +55,7 @@ export default function MockInterview() {
       // Get resume skills from AI service
       const formData = new FormData();
       formData.append('file', resumeFile);
-      const resumeRes = await fetch('http://localhost:8000/api/resume/analyze', {
+      const resumeRes = await fetch(`${AI_SERVICE_URL}/api/resume/analyze`, {
         method: 'POST',
         body: formData
       });

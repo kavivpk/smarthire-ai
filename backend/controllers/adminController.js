@@ -11,11 +11,16 @@ const getDashboardStats = async (req, res) => {
     const totalResumes  = await Resume.countDocuments();
     const totalInterviews = await Interview.countDocuments();
 
-    // Interview scores average
-    const interviews = await Interview.find({}, "score");
-    const avgScore = interviews.length
-      ? (interviews.reduce((sum, i) => sum + (i.score || 0), 0) / interviews.length).toFixed(1)
-      : 0;
+    // Interview scores are stored as totalScore out of 10.
+    // Keep a fallback for older documents that may have used "score".
+    const interviews = await Interview.find({}, "totalScore score");
+    const scoredInterviews = interviews
+      .map((interview) => interview.totalScore ?? interview.score)
+      .filter((score) => typeof score === "number" && Number.isFinite(score));
+
+    const avgScore = scoredInterviews.length
+      ? ((scoredInterviews.reduce((sum, score) => sum + score, 0) / scoredInterviews.length) * 10).toFixed(1)
+      : "0.0";
 
     // Interviews per topic
     const topicStats = await Interview.aggregate([

@@ -1,7 +1,7 @@
 // frontend/src/pages/AdminDashboard.jsx
 
 import { useEffect, useState } from "react";
-import axios from "axios";
+import API from "../services/api";
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale,
@@ -31,12 +31,9 @@ export default function AdminDashboard() {
   const [error, setError]       = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const headers = { Authorization: `Bearer ${token}` };
-
     Promise.all([
-      axios.get("http://localhost:5000/api/admin/stats",    { headers }),
-      axios.get("http://localhost:5000/api/admin/students", { headers })
+      API.get("/admin/stats"),
+      API.get("/admin/students")
     ])
       .then(([statsRes, studentsRes]) => {
         setStats(statsRes.data);

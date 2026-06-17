@@ -1,0 +1,6 @@
+{
+    "python.defaultInterpreterPath": "e:\\Project\\smarthire-ai\\ai-service\\venv\\Scripts\\python.exe",
+    "python.analysis.extraPaths": [
+        "e:\\Project\\smarthire-ai\\ai-service"
+    ]
+}

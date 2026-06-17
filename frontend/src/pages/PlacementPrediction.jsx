@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AI_SERVICE_URL } from '../config/apiConfig';
 
 const SKILLS_LIST = [
   'JavaScript', 'Python', 'Java', 'React', 'Node.js',
@@ -41,7 +42,7 @@ export default function PlacementPrediction() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost:8000/api/prediction/predict', {
+      const response = await fetch(`${AI_SERVICE_URL}/api/prediction/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

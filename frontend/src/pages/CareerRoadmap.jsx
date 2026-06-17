@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AI_SERVICE_URL } from '../config/apiConfig';
 
 const ROLES = [
   'Frontend Developer',
@@ -48,7 +49,7 @@ export default function CareerRoadmap() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost:8000/api/roadmap/generate', {
+      const response = await fetch(`${AI_SERVICE_URL}/api/roadmap/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

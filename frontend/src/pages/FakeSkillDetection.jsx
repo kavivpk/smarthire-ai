@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AI_SERVICE_URL } from '../config/apiConfig';
 
 
 export default function FakeSkillDetection() {
@@ -24,7 +25,7 @@ export default function FakeSkillDetection() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('http://localhost:8000/api/fakeskill/detect', {
+      const res = await fetch(`${AI_SERVICE_URL}/api/fakeskill/detect`, {
         method: 'POST',
         body: formData,
       });

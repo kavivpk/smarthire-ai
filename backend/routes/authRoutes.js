@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { register, login } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
 router.post('/register', register);
 router.post('/login', login);

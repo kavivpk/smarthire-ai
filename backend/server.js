@@ -15,15 +15,36 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// Dynamic CORS: allow any localhost port in dev, plus explicitly configured origins
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., curl, Postman, mobile apps)
+    if (!origin) return callback(null, true);
+    // Allow any localhost origin (any port) for development
+    if (/^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
+    // Allow configured origins
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 // Socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin || /^http:\/\/localhost:\d+$/.test(origin) || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'POST']
   }
 });
 
-app.use(cors({ origin: allowedOrigins }));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Uploads folder
@@ -328,6 +349,14 @@ io.on('connection', (socket) => {
 
     room.chat.push(chatMsg);
     io.to(roomId).emit('new_message', chatMsg);
+  });
+
+  // ── Start Interview ──
+  socket.on('start_interview', ({ roomId }) => {
+    if (rooms[roomId]) {
+      rooms[roomId].status = 'active';
+    }
+    io.to(roomId).emit('interview_started');
   });
 
   // ── End Interview ──

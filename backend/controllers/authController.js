@@ -5,7 +5,14 @@ const jwt = require('jsonwebtoken');
 // Register
 const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, adminSecret } = req.body;
+
+    if (role === 'admin') {
+      const validSecret = process.env.ADMIN_SECRET || 'smarthire2024';
+      if (adminSecret !== validSecret) {
+        return res.status(403).json({ message: 'Invalid Admin Secret Key' });
+      }
+    }
 
     // Already exists check
     const existingUser = await User.findOne({ email });
@@ -56,6 +63,11 @@ const login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ message: 'Invalid email or password' });
+    }
+
+    // Google-only account check
+    if (!user.password) {
+      return res.status(400).json({ message: 'This account uses Google Sign-In. Please continue with Google.' });
     }
 
     // Password check

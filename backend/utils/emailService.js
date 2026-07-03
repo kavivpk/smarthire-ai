@@ -118,4 +118,81 @@ const sendRoomInvite = async (toEmail, roomId, studentName, interviewerName) => 
   return transporter.sendMail(mailOptions);
 };
 
-module.exports = { sendRoomInvite };
+const sendAptitudeResult = async (toEmail, studentName, resultData) => {
+  const transporter = createTransporter();
+
+  const mailOptions = {
+    from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
+    to: toEmail,
+    subject: `📊 Your Aptitude Assessment Results`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+          .container { max-width: 500px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #1e3a5f, #2563eb); padding: 32px; text-align: center; }
+          .logo { color: white; font-size: 24px; font-weight: bold; margin-bottom: 4px; }
+          .logo span { color: #60a5fa; }
+          .subtitle { color: #93c5fd; font-size: 14px; }
+          .body { padding: 32px; }
+          .greeting { font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 8px; }
+          .message { color: #6b7280; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+          .score-box { background: #f0f9ff; border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px; }
+          .score-label { color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+          .score-val { font-size: 32px; font-weight: bold; color: #1d4ed8; }
+          .section-breakdown { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 24px; }
+          .section-title { font-size: 14px; font-weight: bold; color: #4b5563; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+          .footer { background: #f9fafb; padding: 16px; text-align: center; font-size: 12px; color: #9ca3af; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">SmartHire <span>AI</span></div>
+            <div class="subtitle">Aptitude Test Result</div>
+          </div>
+          <div class="body">
+            <div class="greeting">Hello, ${studentName || 'Student'}! 👋</div>
+            <div class="message">
+              Thank you for completing the aptitude assessment on SmartHire AI. 
+              We have successfully evaluated your test.
+            </div>
+
+            <div class="score-box">
+              <div class="score-label">Total Score</div>
+              <div class="score-val">${resultData.totalScore || 0}%</div>
+            </div>
+
+            ${resultData.categoryScores && Object.keys(resultData.categoryScores).length > 0 ? `
+            <div class="section-breakdown">
+              <div class="section-title">Section-wise Breakdown</div>
+              ${Object.entries(resultData.categoryScores).map(([category, score]) => `
+                <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb;">
+                  <span style="font-weight: 500; color: #374151;">${category}</span>
+                  <span style="color: #2563eb; font-weight: bold;">${score.correct} / ${score.total}</span>
+                </div>
+              `).join('')}
+            </div>
+            ` : ''}
+
+            <div class="message">
+              <strong>Overall Details:</strong><br>
+              Correct Answers: ${resultData.correct} out of ${resultData.total}<br><br>
+              Keep practicing to improve your placement readiness!
+            </div>
+          </div>
+          <div class="footer">
+            © 2024 SmartHire AI · AI-Powered Placement Intelligence
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  return transporter.sendMail(mailOptions);
+};
+
+module.exports = { sendRoomInvite, sendAptitudeResult };

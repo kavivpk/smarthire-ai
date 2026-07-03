@@ -1,16 +1,52 @@
-# SmartHire AI
+# SmartHire AI 🚀
 
-AI-powered placement preparation platform with resume analysis, mock interviews, placement prediction, fake skill detection, live interviews, and admin analytics.
+SmartHire AI is an advanced, AI-powered placement preparation platform designed to help students and professionals excel in their career journey. It provides a comprehensive suite of tools ranging from automated resume analysis to live collaborative interviews and machine learning-powered placement predictions.
 
-## Tech Stack
+## 🌟 Key Features
 
-- Frontend: React, Vite, Tailwind CSS
-- Backend: Node.js, Express, MongoDB, JWT, Socket.io, Nodemailer
-- AI service: FastAPI, scikit-learn, Groq
+1. **AI Resume Analysis (ATS)** 📄
+   - Automatically parses PDF resumes.
+   - Computes an ATS score based on keywords and formatting.
+   - Highlights missing skills to help you pass automated screening.
 
-## Local Setup
+2. **Aptitude & AI Mock Interviews** 🤖
+   - Auto-generated technical, analytical, and logical reasoning tests.
+   - Interactive mock interviews for 5 customizable topics.
+   - Real-time scoring and email result notifications with section-wise breakdowns.
 
-1. Create environment files from the examples:
+3. **Fake Skill Detection** 🔍
+   - Validates skills claimed on the resume through targeted AI-generated questions.
+   - Prevents resume padding by assessing actual competency in real-time.
+
+4. **Live Collaborative Interviews** 💻
+   - **Video/Audio Calling**: Seamless WebRTC-based communication.
+   - **Live Code Editor**: Real-time collaborative coding environment.
+   - **Screen Sharing**: Effortless sharing for system design and presentations.
+   - **Admin Controls**: Interviewers can push questions to candidates and submit manual evaluation scores.
+
+5. **ML Placement Prediction** 📊
+   - Uses historical data and your performance metrics (ATS score, mock interview results).
+   - Machine learning algorithms predict your placement probability and provide actionable insights.
+
+6. **Personalized Career Roadmap** 🗺️
+   - Generates an 8-week structured learning timeline based on your target role and current skill gaps.
+
+7. **Admin Dashboard** 👑
+   - **Analytics**: Track student progress, total interviews, and average scores.
+   - **Dynamic Question Management**: Easily upload new aptitude questions to the database which will automatically rotate into student exams.
+   - **Secure Access**: Admin registration is protected by a secret key to prevent unauthorized access.
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React, Vite, Tailwind CSS, Monaco Editor
+- **Backend**: Node.js, Express, MongoDB, Socket.io, Nodemailer, JSON Web Tokens (JWT)
+- **AI Service**: Python, FastAPI, scikit-learn, Groq (Llama-3 models)
+
+## 🚀 Local Setup
+
+### 1. Environment Configuration
+
+Create environment files from the provided examples in each directory:
 
 ```powershell
 copy frontend\.env.example frontend\.env
@@ -18,76 +54,81 @@ copy backend\.env.example backend\.env
 copy ai-service\.env.example ai-service\.env
 ```
 
-2. Install dependencies:
+**Backend (`backend/.env`)**
+- `PORT=5000`
+- `MONGO_URI=mongodb://127.0.0.1:27017/smarthire-ai`
+- `JWT_SECRET=your-secret-key`
+- `FRONTEND_URL=http://localhost:5173`
+- `EMAIL_USER=your-email@gmail.com`
+- `EMAIL_PASS=your-app-password`
+- `ADMIN_SECRET=smarthire2024` (Required to register an admin account)
 
+**Frontend (`frontend/.env`)**
+- `VITE_API_URL=http://localhost:5000/api`
+- `VITE_AI_SERVICE_URL=http://localhost:8000`
+- `VITE_FIREBASE_API_KEY=...` (Add your Firebase config if you use Google Auth)
+
+**AI Service (`ai-service/.env`)**
+- `GROQ_API_KEY=your_groq_api_key`
+
+### 2. Install Dependencies
+
+**Frontend:**
 ```powershell
 cd frontend
 npm install
+```
 
-cd ..\backend
+**Backend:**
+```powershell
+cd backend
 npm install
+```
 
-cd ..\ai-service
+**AI Service:**
+```powershell
+cd ai-service
 pip install -r requirements.txt
 ```
 
-3. Start services:
+### 3. Start the Services
 
+Open three separate terminals and start the development servers:
+
+**Backend:**
 ```powershell
 cd backend
 npm run dev
+```
 
-cd ..\ai-service
+**AI Service:**
+```powershell
+cd ai-service
 uvicorn main:app --reload --port 8000
+```
 
-cd ..\frontend
+**Frontend:**
+```powershell
+cd frontend
 npm run dev
 ```
 
-Local URLs:
+The application will be available at `http://localhost:5173`.
 
-- Frontend: `http://localhost:5173`
-- Backend: `http://localhost:5000`
-- AI service: `http://localhost:8000`
+## 🌐 Deployment
 
-## Environment Variables
+For deploying to production, follow these recommended platforms:
 
-Frontend:
+- **Frontend**: [Vercel](https://vercel.com/) (Root: `frontend`, Build: `npm run build`, Output: `dist`)
+- **Backend**: [Render](https://render.com/) (Root: `backend`, Build: `npm ci --omit=dev`, Start: `npm start`)
+- **AI Service**: [Railway](https://railway.app/) (Deploy via Dockerfile in `ai-service`)
+- **Database**: MongoDB Atlas
 
-- `VITE_API_URL`: backend API URL, for example `http://localhost:5000/api`
-- `VITE_AI_SERVICE_URL`: FastAPI service URL, for example `http://localhost:8000`
+*Ensure all environment variables are correctly set in the deployment platforms matching the production URLs.*
 
-Backend:
+## 📈 Recent Improvements & Fixes
 
-- `PORT`: backend port
-- `MONGO_URI`: MongoDB connection string
-- `JWT_SECRET`: JWT signing secret
-- `FRONTEND_URL`: allowed frontend origins, comma-separated for multiple domains
-- `EMAIL_USER`: Gmail sender account
-- `EMAIL_PASS`: Gmail app password
-
-AI service:
-
-- `GROQ_API_KEY`: Groq API key used by roadmap and fake skill detection
-
-## Deployment
-
-Recommended beginner path:
-
-- Frontend: Vercel, root directory `frontend`, build command `npm run build`, output `dist`
-- Backend: Render, root directory `backend`, build command `npm ci --omit=dev`, start command `npm start`
-- AI service: Railway, root directory `ai-service`, Dockerfile deploy
-- Database: MongoDB Atlas
-
-After deployment, set:
-
-- `frontend/.env`: `VITE_API_URL=https://your-backend.onrender.com/api`
-- `frontend/.env`: `VITE_AI_SERVICE_URL=https://your-ai-service.up.railway.app`
-- `backend/.env`: `FRONTEND_URL=https://your-frontend.vercel.app`
-
-## Completed Fixes
-
-- Admin stats now average saved interview `totalScore` values correctly.
-- Admin routes are mounted at `/api/admin`.
-- Live interview email invites validate required fields and use the saved user name/email when available.
-- Frontend service URLs are environment-driven for deployment.
+- 🔒 **Admin Security**: Added `ADMIN_SECRET` verification to block standard users from gaining admin access.
+- 📊 **Enhanced Email Reports**: Aptitude test result emails now include a detailed section-by-section breakdown.
+- ✏️ **Dynamic Question Engine**: Admins can now add custom aptitude questions directly via the Admin Dashboard GUI.
+- 🎨 **UI/UX Polish**: Improved light/dark mode visibility, fixed component overflows, layout tweaks for seamless workflow.

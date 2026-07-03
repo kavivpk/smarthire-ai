@@ -55,16 +55,85 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
-// GET /api/admin/students
 const getAllStudents = async (req, res) => {
   try {
     const students = await User.find({ role: "student" })
       .select("-password")
-      .sort({ createdAt: -1 });
-    res.json(students);
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const studentIds = students.map(s => s._id);
+
+    // Get Interview stats
+    const interviewStats = await Interview.aggregate([
+      { $match: { userId: { $in: studentIds } } },
+      { $group: {
+          _id: "$userId",
+          interviewsTaken: { $sum: 1 },
+          avgScore: { $avg: { $ifNull: ["$totalScore", "$score"] } }
+      }}
+    ]);
+
+    // Get Resume stats (latest resume for each user)
+    const resumes = await Resume.aggregate([
+      { $match: { userId: { $in: studentIds } } },
+      { $sort: { createdAt: -1 } },
+      { $group: {
+          _id: "$userId",
+          resumeScore: { $first: "$atsScore" }
+      }}
+    ]);
+
+    // Create maps for quick lookup
+    const interviewMap = {};
+    interviewStats.forEach(stat => {
+      interviewMap[stat._id.toString()] = stat;
+    });
+
+    const resumeMap = {};
+    resumes.forEach(stat => {
+      resumeMap[stat._id.toString()] = stat;
+    });
+
+    // Merge data
+    const enrichedStudents = students.map(student => {
+      const iStat = interviewMap[student._id.toString()];
+      const rStat = resumeMap[student._id.toString()];
+      return {
+        ...student,
+        interviewsTaken: iStat ? iStat.interviewsTaken : 0,
+        avgInterviewScore: iStat && iStat.avgScore != null ? (iStat.avgScore * 10).toFixed(1) + '%' : "N/A",
+        resumeScore: rStat && rStat.resumeScore != null ? rStat.resumeScore + '%' : "N/A"
+      };
+    });
+
+    res.json(enrichedStudents);
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
-module.exports = { getDashboardStats, getAllStudents };
+// POST /api/admin/questions/aptitude
+const addAptitudeQuestion = async (req, res) => {
+  try {
+    const { section, question, options, answer } = req.body;
+    
+    if (!section || !question || !options || options.length !== 4 || answer === undefined) {
+      return res.status(400).json({ message: "All fields are required and options must be exactly 4." });
+    }
+
+    const AptitudeQuestion = require("../models/AptitudeQuestion");
+    const newQuestion = await AptitudeQuestion.create({
+      section,
+      question,
+      options,
+      answer
+    });
+
+    res.status(201).json({ message: "Question added successfully", data: newQuestion });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+module.exports = { getDashboardStats, getAllStudents, addAptitudeQuestion };

@@ -1,4 +1,7 @@
 const Interview = require('../models/Interview');
+const User = require('../models/User');
+const AptitudeQuestion = require('../models/AptitudeQuestion');
+const { sendAptitudeResult } = require('../utils/emailService');
 
 // Skill-based question bank
 const skillQuestions = {
@@ -278,35 +281,141 @@ const getHistory = async (req, res) => {
   }
 };
 
-// Aptitude question bank — 20 questions across 4 categories
-const aptitudeBank = [
-  { id:0, category:'Logical', question:'If all Bloops are Razzies and all Razzies are Lazzies, then all Bloops are definitely:', options:['Razzies','Lazzies','Not Razzies','None of these'], answer:1 },
-  { id:1, category:'Logical', question:'A is taller than B. C is shorter than A. D is taller than C but shorter than B. Who is tallest?', options:['A','B','C','D'], answer:0 },
-  { id:2, category:'Logical', question:'Find the odd one out: 2, 3, 5, 7, 11, 14, 17', options:['14','11','17','5'], answer:0 },
-  { id:3, category:'Logical', question:'All cats are dogs. All dogs are birds. Conclusion: All cats are birds.', options:['True','False','Cannot determine','Partially true'], answer:0 },
-  { id:4, category:'Logical', question:'If ROSE is coded as 6821, CHAIR is coded as 73456, what is EACH coded as?', options:['2537','1783','2783','1537'], answer:2 },
-  { id:5, category:'Quantitative', question:'A train 150m long passes a pole in 15 seconds. Its speed in km/h is:', options:['36','40','54','60'], answer:0 },
-  { id:6, category:'Quantitative', question:'The sum of first 20 natural numbers is:', options:['190','200','210','220'], answer:2 },
-  { id:7, category:'Quantitative', question:'If 8 workers build a wall in 10 days, how many days will 4 workers take?', options:['5','15','20','25'], answer:2 },
-  { id:8, category:'Quantitative', question:'A number increased by 20% then decreased by 20%. Net change is:', options:['0%','4% decrease','4% increase','2% decrease'], answer:1 },
-  { id:9, category:'Quantitative', question:'What is 15% of 480?', options:['62','68','72','78'], answer:2 },
-  { id:10, category:'Verbal', question:'Choose the synonym of BENEVOLENT:', options:['Kind','Cruel','Selfish','Greedy'], answer:0 },
-  { id:11, category:'Verbal', question:'Choose the antonym of OBSCURE:', options:['Hidden','Clear','Dark','Vague'], answer:1 },
-  { id:12, category:'Verbal', question:'Fill in the blank: She _____ to the office every day.', options:['go','goes','going','gone'], answer:1 },
-  { id:13, category:'Verbal', question:'Identify the correctly spelled word:', options:['Accomodate','Accommodate','Acomodate','Accommadate'], answer:1 },
-  { id:14, category:'Verbal', question:'The idiom "Break the ice" means:', options:['Destroy something','Start a conversation','End a fight','Win a game'], answer:1 },
-  { id:15, category:'Technical', question:'What does CPU stand for?', options:['Central Processing Unit','Control Processing Unit','Central Program Unit','Core Processing Unit'], answer:0 },
-  { id:16, category:'Technical', question:'Which data structure works on LIFO principle?', options:['Queue','Stack','Array','Tree'], answer:1 },
-  { id:17, category:'Technical', question:'What is the time complexity of binary search?', options:['O(n)','O(n2)','O(log n)','O(n log n)'], answer:2 },
-  { id:18, category:'Technical', question:'Which of the following is NOT an OOP concept?', options:['Inheritance','Polymorphism','Compilation','Encapsulation'], answer:2 },
-  { id:19, category:'Technical', question:'What does HTTP stand for?', options:['HyperText Transfer Protocol','High Text Transfer Protocol','HyperText Transmission Protocol','HyperText Transport Protocol'], answer:0 },
+// Aptitude question bank — 5 sections × 15 questions = 75 total
+const aptitudeSections = [
+  {
+    section: 'Analytical',
+    icon: '🔍',
+    questions: [
+      { id:'a0', question:'If A > B and B > C, which is definitely true?', options:['C > A','A > C','B > A','C > B'], answer:1 },
+      { id:'a1', question:'A clock shows 3:15. What is the angle between the hands?', options:['0°','7.5°','30°','45°'], answer:1 },
+      { id:'a2', question:'Find the next number: 2, 6, 12, 20, 30, __', options:['40','42','44','46'], answer:1 },
+      { id:'a3', question:'A is twice as old as B. 10 years ago A was 3 times as old as B. What is A\'s age now?', options:['30','40','20','60'], answer:1 },
+      { id:'a4', question:'Pointing to a boy, Sara said "He is the son of my grandfather\'s only child." How is Sara related to the boy?', options:['Sister','Mother','Cousin','Aunt'], answer:0 },
+      { id:'a5', question:'Complete: 1, 4, 9, 16, 25, __', options:['30','35','36','40'], answer:2 },
+      { id:'a6', question:'In a row of 20 students, Rohan is 8th from the left. What is his position from the right?', options:['11','12','13','14'], answer:2 },
+      { id:'a7', question:'A box has red and blue balls. 5 are red. Total is 12. How many are blue?', options:['5','6','7','8'], answer:2 },
+      { id:'a8', question:'Find the odd one out: 36, 49, 64, 72, 81', options:['36','49','72','81'], answer:2 },
+      { id:'a9', question:'If 5 cats catch 5 mice in 5 minutes, how many minutes do 100 cats take to catch 100 mice?', options:['1','5','100','20'], answer:1 },
+      { id:'a10', question:'A cube has 6 faces. How many edges does it have?', options:['8','10','12','16'], answer:2 },
+      { id:'a11', question:'What comes next in: B, D, G, K, P, __?', options:['T','U','V','W'], answer:2 },
+      { id:'a12', question:'The average of 5 numbers is 27. If one number is removed the average becomes 25. What is the removed number?', options:['30','35','37','40'], answer:1 },
+      { id:'a13', question:'How many times does the digit 3 appear from 1 to 100?', options:['10','19','20','21'], answer:2 },
+      { id:'a14', question:'Ravi is 7 ranks ahead of Sunil in a class of 35. If Sunil\'s rank from last is 13, what is Ravi\'s rank from front?', options:['15','16','17','18'], answer:0 },
+    ]
+  },
+  {
+    section: 'Logical',
+    icon: '🧩',
+    questions: [
+      { id:'l0', question:'All cats are dogs. All dogs are birds. Conclusion: All cats are birds.', options:['True','False','Cannot determine','Partially true'], answer:0 },
+      { id:'l1', question:'If ROSE is coded as 6821, CHAIR is coded as 73456, what is EACH coded as?', options:['2537','1783','2783','1537'], answer:2 },
+      { id:'l2', question:'Find the odd one out: 2, 3, 5, 7, 11, 14, 17', options:['14','11','17','5'], answer:0 },
+      { id:'l3', question:'A is taller than B. C is shorter than A. D is taller than C but shorter than B. Who is tallest?', options:['A','B','C','D'], answer:0 },
+      { id:'l4', question:'If all Bloops are Razzies and all Razzies are Lazzies, then all Bloops are definitely:', options:['Razzies','Lazzies','Not Razzies','None of these'], answer:1 },
+      { id:'l5', question:'Monday is to Sun as Thursday is to?', options:['Jupiter','Mars','Mercury','Saturn'], answer:1 },
+      { id:'l6', question:'Complete the pattern: AZ, BY, CX, DW, __', options:['EV','EU','FV','EW'], answer:0 },
+      { id:'l7', question:'If FRIEND = 613520, FIGHT = 61879, what is FRIGHT?', options:['613879','618739','619879','613789'], answer:0 },
+      { id:'l8', question:'Some pens are pencils. All pencils are erasers. Conclusion: Some pens are erasers.', options:['True','False','Cannot determine','Partially true'], answer:0 },
+      { id:'l9', question:'If yesterday was Saturday, what will be the day after tomorrow?', options:['Monday','Tuesday','Wednesday','Sunday'], answer:1 },
+      { id:'l10', question:'Arrange: Bud→Flower→Seed→Fruit. Which is the correct order?', options:['Bud,Flower,Fruit,Seed','Seed,Bud,Flower,Fruit','Flower,Bud,Fruit,Seed','Bud,Seed,Fruit,Flower'], answer:1 },
+      { id:'l11', question:'In a family, if P is father of Q, Q is mother of R, what is P to R?', options:['Uncle','Grandfather','Father','Cousin'], answer:1 },
+      { id:'l12', question:'A man walks 3km north, turns right and walks 4km. How far is he from start?', options:['3km','4km','5km','7km'], answer:2 },
+      { id:'l13', question:'No teachers are students. All students are scholars. Conclusion: No teachers are scholars.', options:['True','False','Cannot determine','Partially true'], answer:2 },
+      { id:'l14', question:'Find next: 3, 9, 27, 81, __', options:['162','243','324','729'], answer:1 },
+    ]
+  },
+  {
+    section: 'Verbal',
+    icon: '📝',
+    questions: [
+      { id:'v0', question:'Choose the synonym of BENEVOLENT:', options:['Kind','Cruel','Selfish','Greedy'], answer:0 },
+      { id:'v1', question:'Choose the antonym of OBSCURE:', options:['Hidden','Clear','Dark','Vague'], answer:1 },
+      { id:'v2', question:'Fill in the blank: She _____ to the office every day.', options:['go','goes','going','gone'], answer:1 },
+      { id:'v3', question:'Identify the correctly spelled word:', options:['Accomodate','Accommodate','Acomodate','Accommadate'], answer:1 },
+      { id:'v4', question:'The idiom "Break the ice" means:', options:['Destroy something','Start a conversation','End a fight','Win a game'], answer:1 },
+      { id:'v5', question:'Choose the word closest in meaning to AMIABLE:', options:['Angry','Friendly','Distant','Proud'], answer:1 },
+      { id:'v6', question:'Which sentence is grammatically correct?', options:['He don\'t know','He doesn\'t know','He not know','He knowing'], answer:1 },
+      { id:'v7', question:'"Bite the bullet" means:', options:['Shoot someone','Endure pain','Eat quickly','Talk too much'], answer:1 },
+      { id:'v8', question:'Antonym of LOQUACIOUS:', options:['Talkative','Quiet','Loud','Clever'], answer:1 },
+      { id:'v9', question:'Fill in: Neither John nor his brothers _____ attending.', options:['is','are','was','be'], answer:1 },
+      { id:'v10', question:'Choose the synonym of OBSTINATE:', options:['Flexible','Stubborn','Kind','Weak'], answer:1 },
+      { id:'v11', question:'Correct the sentence: "He is more cleverer than you."', options:['He is more clever than you','He is cleverer than you','He is most clever than you','No change needed'], answer:1 },
+      { id:'v12', question:'"A blessing in disguise" means:', options:['A hidden curse','Something good that seemed bad','A lie told kindly','A secret kept well'], answer:1 },
+      { id:'v13', question:'The plural of "phenomenon" is:', options:['Phenomenons','Phenomenas','Phenomena','Phenomenon'], answer:2 },
+      { id:'v14', question:'Fill: I wish I _____ a millionaire.', options:['am','are','were','was'], answer:2 },
+    ]
+  },
+  {
+    section: 'Quantitative',
+    icon: '🔢',
+    questions: [
+      { id:'q0', question:'A train 150m long passes a pole in 15 seconds. Its speed in km/h is:', options:['36','40','54','60'], answer:0 },
+      { id:'q1', question:'The sum of first 20 natural numbers is:', options:['190','200','210','220'], answer:2 },
+      { id:'q2', question:'If 8 workers build a wall in 10 days, how many days will 4 workers take?', options:['5','15','20','25'], answer:2 },
+      { id:'q3', question:'A number increased by 20% then decreased by 20%. Net change is:', options:['0%','4% decrease','4% increase','2% decrease'], answer:1 },
+      { id:'q4', question:'What is 15% of 480?', options:['62','68','72','78'], answer:2 },
+      { id:'q5', question:'Simple interest on Rs.4000 at 10% per annum for 3 years is:', options:['Rs.1000','Rs.1200','Rs.1400','Rs.1600'], answer:1 },
+      { id:'q6', question:'A tank is filled in 6 hours by pipe A alone. In 9 hours by pipe B alone. In how many hours both together?', options:['3.6','4','4.5','5'], answer:0 },
+      { id:'q7', question:'If a product costs Rs.200 with 10% discount, what is MRP?', options:['Rs.220','Rs.222','Rs.250','Rs.200'], answer:1 },
+      { id:'q8', question:'LCM of 12 and 18 is:', options:['6','36','24','72'], answer:1 },
+      { id:'q9', question:'Profit percent if CP=Rs.400 and SP=Rs.500:', options:['20%','25%','30%','15%'], answer:1 },
+      { id:'q10', question:'A can finish work in 20 days, B in 30 days. Together they finish in:', options:['10','12','15','25'], answer:1 },
+      { id:'q11', question:'The HCF of 16, 24, 36 is:', options:['2','4','6','8'], answer:1 },
+      { id:'q12', question:'Speed of a boat downstream is 18 km/h, upstream 12 km/h. Speed of stream is:', options:['2 km/h','3 km/h','6 km/h','5 km/h'], answer:1 },
+      { id:'q13', question:'Compound interest on Rs.1000 at 10% per year for 2 years is:', options:['Rs.200','Rs.210','Rs.220','Rs.230'], answer:1 },
+      { id:'q14', question:'A circle has diameter 14 cm. Its area is:', options:['154 cm²','144 cm²','196 cm²','168 cm²'], answer:0 },
+    ]
+  },
+  {
+    section: 'Technical',
+    icon: '💻',
+    questions: [
+      { id:'t0', question:'What does CPU stand for?', options:['Central Processing Unit','Control Processing Unit','Central Program Unit','Core Processing Unit'], answer:0 },
+      { id:'t1', question:'Which data structure works on LIFO principle?', options:['Queue','Stack','Array','Tree'], answer:1 },
+      { id:'t2', question:'What is the time complexity of binary search?', options:['O(n)','O(n²)','O(log n)','O(n log n)'], answer:2 },
+      { id:'t3', question:'Which of the following is NOT an OOP concept?', options:['Inheritance','Polymorphism','Compilation','Encapsulation'], answer:2 },
+      { id:'t4', question:'What does HTTP stand for?', options:['HyperText Transfer Protocol','High Text Transfer Protocol','HyperText Transmission Protocol','HyperText Transport Protocol'], answer:0 },
+      { id:'t5', question:'Which language is primarily used for Android app development?', options:['Swift','Kotlin','Python','Ruby'], answer:1 },
+      { id:'t6', question:'What is the output of: print(2 ** 10) in Python?', options:['20','100','1024','2048'], answer:2 },
+      { id:'t7', question:'What does SQL stand for?', options:['Structured Query Language','Simple Query Language','Sequential Query Language','Standard Query Language'], answer:0 },
+      { id:'t8', question:'What is a primary key in a database?', options:['A key used to encrypt data','A unique identifier for each record','A foreign reference to another table','A key that can be null'], answer:1 },
+      { id:'t9', question:'Which of these is a NoSQL database?', options:['MySQL','PostgreSQL','MongoDB','SQLite'], answer:2 },
+      { id:'t10', question:'What is Git used for?', options:['Graphic design','Version control','Network management','Database queries'], answer:1 },
+      { id:'t11', question:'What does RAM stand for?', options:['Read Access Memory','Random Access Memory','Read And Modify','Rapid Access Module'], answer:1 },
+      { id:'t12', question:'Which protocol is used to send emails?', options:['HTTP','FTP','SMTP','TCP'], answer:2 },
+      { id:'t13', question:'What is the binary equivalent of decimal 10?', options:['1001','1010','1100','1110'], answer:1 },
+      { id:'t14', question:'Which sorting algorithm has O(n log n) average time complexity?', options:['Bubble Sort','Selection Sort','Merge Sort','Insertion Sort'], answer:2 },
+    ]
+  }
 ];
 
 const generateAptitude = async (req, res) => {
   try {
-    const shuffled = [...aptitudeBank].sort(() => Math.random() - 0.5);
-    const questions = shuffled.map(({ id, category, question, options }) => ({ id, category, question, options }));
-    res.json({ questions, total: questions.length });
+    const dynamicQuestions = await AptitudeQuestion.find({});
+
+    // Return sections with shuffled questions within each section
+    const sections = aptitudeSections.map(sec => {
+      // Find matching dynamic questions
+      const matchingDynamic = dynamicQuestions
+        .filter(dq => dq.section.toLowerCase() === sec.section.toLowerCase())
+        .map(dq => ({
+          id: dq._id.toString(),
+          question: dq.question,
+          options: dq.options,
+          answer: dq.answer
+        }));
+
+      const combinedQuestions = [...sec.questions, ...matchingDynamic];
+
+      return {
+        section: sec.section,
+        icon: sec.icon,
+        questions: combinedQuestions.sort(() => Math.random() - 0.5)
+      };
+    });
+
+    res.json({ sections, totalSections: sections.length, totalQuestions: sections.reduce((s, sec) => s + sec.questions.length, 0) });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -315,19 +424,32 @@ const generateAptitude = async (req, res) => {
 const submitAptitude = async (req, res) => {
   try {
     const { answers, questions } = req.body;
-    const qBank = (questions && questions.length > 0) ? questions : aptitudeBank;
+    // questions is a flat array of all questions across sections
+    const qBank = (questions && questions.length > 0) ? questions : aptitudeSections.flatMap(s => s.questions);
     let correct = 0;
     const categoryScores = {};
     const results = qBank.map(q => {
       const selected = (answers && answers[q.id] !== undefined) ? answers[q.id] : -1;
       const isCorrect = selected === q.answer;
       if (isCorrect) correct++;
-      if (!categoryScores[q.category]) categoryScores[q.category] = { correct: 0, total: 0 };
-      categoryScores[q.category].total++;
-      if (isCorrect) categoryScores[q.category].correct++;
-      return { id: q.id, category: q.category, question: q.question, selected, correctAnswer: q.answer, correctOption: q.options[q.answer], isCorrect };
+      const cat = q.section || q.category || 'General';
+      if (!categoryScores[cat]) categoryScores[cat] = { correct: 0, total: 0 };
+      categoryScores[cat].total++;
+      if (isCorrect) categoryScores[cat].correct++;
+      return { id: q.id, category: cat, question: q.question, selected, correctAnswer: q.answer, correctOption: q.options[q.answer], isCorrect };
     });
     const totalScore = Math.round((correct / qBank.length) * 100);
+
+    // Send email asynchronously without blocking the response
+    if (req.user && req.user.id) {
+      User.findById(req.user.id).then(user => {
+        if (user && user.email) {
+          sendAptitudeResult(user.email, user.name, { totalScore, correct, total: qBank.length, categoryScores })
+            .catch(err => console.error('Failed to send aptitude result email:', err));
+        }
+      }).catch(err => console.error('Error fetching user for email:', err));
+    }
+
     res.json({ correct, total: qBank.length, totalScore, categoryScores, results });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

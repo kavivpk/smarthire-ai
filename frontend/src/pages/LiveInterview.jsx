@@ -4,6 +4,7 @@ import API from '../services/api';
 import VideoCall from '../components/VideoCall';
 import CodeEditor from '../components/CodeEditor';
 import { BACKEND_URL, AI_SERVICE_URL } from '../config/apiConfig';
+import { useTheme } from '../context/useTheme';
 
 const SOCKET_URL = BACKEND_URL;
 
@@ -17,13 +18,15 @@ const DiffBadge = ({ d }) => {
 
 // ─── Score ring ─────────────────────────────────────────────────────────────
 const ScoreRing = ({ score, max = 100, size = 120 }) => {
+  const { isDark } = useTheme();
   const pct = Math.min(Math.max(score, 0), max) / max;
   const r = 44, C = 2 * Math.PI * r;
   const color = score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444';
+  const trackColor = isDark ? '#374151' : '#e5e7eb';
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#374151" strokeWidth="8" />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={trackColor} strokeWidth="8" />
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth="8"
           strokeDasharray={C} strokeDashoffset={C * (1 - pct)} strokeLinecap="round"
           style={{ transition: 'stroke-dashoffset 1s ease' }} />
@@ -37,6 +40,7 @@ const ScoreRing = ({ score, max = 100, size = 120 }) => {
 };
 
 export default function LiveInterview() {
+  const { isDark } = useTheme();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   // ── global state ──────────────────────────────────────────────────────────
@@ -84,13 +88,22 @@ export default function LiveInterview() {
   const [emailSent, setEmailSent] = useState(false);
 
   // ── Aptitude state ────────────────────────────────────────────────────────
+  const [aptSections, setAptSections] = useState([]);
   const [aptitudeQuestions, setAptitudeQuestions] = useState([]);
   const [aptAnswers, setAptAnswers] = useState({});
-  const [aptPage, setAptPage] = useState(0);
+  const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
+  const [currentAptQuestionIdx, setCurrentAptQuestionIdx] = useState(0);
+  const [aptTotalTimeLeft, setAptTotalTimeLeft] = useState(4500);
   const [aptLoading, setAptLoading] = useState(false);
   const [aptResult, setAptResult] = useState(null);
   const [aptSubmitting, setAptSubmitting] = useState(false);
-  const QUESTIONS_PER_PAGE = 5;
+  const [showSectionConfirm, setShowSectionConfirm] = useState(false);
+  const [sectionConfirmInput, setSectionConfirmInput] = useState('');
+  const [aptSectionTimeLeft, setAptSectionTimeLeft] = useState(0);
+  
+  // ── Result / Feedback state ───────────────────────────────────────────────
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackRatings, setFeedbackRatings] = useState([0,0,0,0,0]);
 
   // ── Coding state ──────────────────────────────────────────────────────────
   const [codingProblems, setCodingProblems] = useState([]);
@@ -106,6 +119,7 @@ export default function LiveInterview() {
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [consoleTab, setConsoleTab] = useState('testcases'); // 'testcases' | 'result'
   const [activeTestcaseIdx, setActiveTestcaseIdx] = useState(0);
+  const [codingTimeLeft, setCodingTimeLeft] = useState(1200); // 20 minutes in seconds
 
   // ── Resume-based Q&A state ───────────────────────────────────────────────
   const [resumeFile, setResumeFile] = useState(null);
@@ -146,9 +160,19 @@ export default function LiveInterview() {
     setError('');
     try {
       const res = await API.post('/interview/aptitude');
-      setAptitudeQuestions(res.data.questions);
+      const sections = res.data.sections || [];
+      setAptSections(sections);
+      
+      // Flatten all questions for final submit evaluation
+      const flat = sections.flatMap(sec => sec.questions.map(q => ({ ...q, section: sec.section })));
+      setAptitudeQuestions(flat);
+      
       setAptAnswers({});
-      setAptPage(0);
+      setCurrentSectionIdx(0);
+      setCurrentAptQuestionIdx(0);
+      setAptTotalTimeLeft(flat.length * 60); // 1 min per question total
+      const firstSecLen = sections[0]?.questions?.length || 0;
+      setAptSectionTimeLeft(firstSecLen * 60); // section timer
       setAptResult(null);
       setStage('aptitude');
     } catch (e) {
@@ -173,6 +197,75 @@ export default function LiveInterview() {
       setAptSubmitting(false);
     }
   };
+
+  const handleNextAptQuestion = () => {
+    const currentSection = aptSections[currentSectionIdx];
+    if (!currentSection) return;
+
+    if (currentAptQuestionIdx + 1 < currentSection.questions.length) {
+      setCurrentAptQuestionIdx(prev => prev + 1);
+    } else {
+      // End of section
+      if (currentSectionIdx + 1 < aptSections.length) {
+        setCurrentSectionIdx(prev => prev + 1);
+        setCurrentAptQuestionIdx(0);
+      } else {
+        // End of test
+        submitAptitude();
+      }
+    }
+  };
+
+  const handlePrevAptQuestion = () => {
+    if (currentAptQuestionIdx > 0) {
+      setCurrentAptQuestionIdx(prev => prev - 1);
+    } else if (currentSectionIdx > 0) {
+      const prevSecIdx = currentSectionIdx - 1;
+      setCurrentSectionIdx(prevSecIdx);
+      setCurrentAptQuestionIdx(aptSections[prevSecIdx].questions.length - 1);
+    }
+  };
+
+  const handleSubmitSection = () => {
+    const isLastSection = currentSectionIdx >= aptSections.length - 1;
+    if (isLastSection) {
+      submitAptitude();
+    } else {
+      const nextIdx = currentSectionIdx + 1;
+      const nextSecLen = aptSections[nextIdx]?.questions?.length || 0;
+      setAptSectionTimeLeft(nextSecLen * 60); // reset section timer
+      setCurrentSectionIdx(nextIdx);
+      setCurrentAptQuestionIdx(0);
+    }
+  };
+
+  // Aptitude Global Timer
+  useEffect(() => {
+    if (stage !== 'aptitude' || aptResult || aptitudeQuestions.length === 0) return;
+    const interval = setInterval(() => {
+      setAptTotalTimeLeft(prev => {
+        if (prev <= 1) { submitAptitude(); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [stage, aptResult, aptitudeQuestions]);
+
+  // Aptitude Per-Section Timer
+  useEffect(() => {
+    if (stage !== 'aptitude' || aptResult || aptSectionTimeLeft <= 0) return;
+    const interval = setInterval(() => {
+      setAptSectionTimeLeft(prev => {
+        if (prev <= 1) {
+          // Section time expired — auto advance
+          handleSubmitSection();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [stage, aptResult, currentSectionIdx]);
 
   // ══════════════════════════════════════════════════════════════════════════
   // CODING FLOW
@@ -263,6 +356,59 @@ export default function LiveInterview() {
     }
   };
 
+  const handleAutoSubmitCode = async () => {
+    let finalResults = codingResults;
+    if (codingCode.trim()) {
+      try {
+        const prob = codingProblems[codingProblemIndex];
+        const res = await API.post('/interview/evaluate-code', {
+          code: codingCode,
+          language: codingLanguage,
+          problem: prob.description,
+          runOnly: false,
+          testCases: prob.testCases
+        });
+        const evalData = res.data;
+        finalResults = [...codingResults, { problemId: prob.id, title: prob.title, ...evalData }];
+        setCodingResults(finalResults);
+      } catch (err) {
+        // Safe fail
+      }
+    }
+    
+    const nextIdx = codingProblemIndex + 1;
+    if (nextIdx >= codingProblems.length) {
+      setStage('result');
+      setResult({ type: 'coding', results: finalResults });
+    } else {
+      setCodingProblemIndex(nextIdx);
+      setCodingEval(null);
+      setCodingCode(codingProblems[nextIdx]?.starterCode?.[codingLanguage] || '// Write your solution here\n');
+    }
+  };
+
+  // Coding Timers
+  useEffect(() => {
+    if (stage !== 'coding' || codingProblems.length === 0) return;
+    setCodingTimeLeft(1200); // 20 minutes
+  }, [stage, codingProblemIndex, codingProblems]);
+
+  useEffect(() => {
+    if (stage !== 'coding' || codingProblems.length === 0) return;
+
+    const interval = setInterval(() => {
+      setCodingTimeLeft(prev => {
+        if (prev <= 1) {
+          handleAutoSubmitCode();
+          return 1200;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [stage, codingProblemIndex, codingProblems, codingCode, codingLanguage]);
+
   // ══════════════════════════════════════════════════════════════════════════
   // SOCKET / ADMIN INTERVIEW FLOW
   // ══════════════════════════════════════════════════════════════════════════
@@ -292,7 +438,11 @@ export default function LiveInterview() {
     newSocket.on('room_joined', ({ roomId: id, mode: roomMode, participants: p }) => {
       setRoomId(id);
       setParticipants(p);
-      setStage(roomMode === 'admin' ? 'interview' : 'waiting');
+      // Always go to waiting — new_question will move everyone to 'interview'
+      setStage('waiting');
+    });
+    newSocket.on('interview_started', () => {
+      setStage('interview');
     });
     // AI monitoring update (admin sees this)
     newSocket.on('ai_monitor_update', (data) => {
@@ -302,6 +452,7 @@ export default function LiveInterview() {
     setSocket(newSocket);
     return newSocket;
   }, []);
+
 
   const startAiTechInterview = async () => {
     if (!resumeFile) { setError('Please upload your resume to start'); return; }
@@ -380,6 +531,8 @@ export default function LiveInterview() {
     setAdminQuestion('');
   };
 
+  const startInterview = () => { if (socket) socket.emit('start_interview', { roomId }); };
+
   const handleEndInterview = () => { if (socket) socket.emit('end_interview', { roomId }); };
 
   const handleSendEmailInvite = async () => {
@@ -422,16 +575,16 @@ export default function LiveInterview() {
   // RENDER: SETUP
   // ══════════════════════════════════════════════════════════════════════════
   if (stage === 'setup') return (
-    <div className="min-h-screen bg-gray-950 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 md:p-8 transition-colors duration-300">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center pt-4">
           <div className="inline-flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-4 py-1.5 rounded-full mb-4">
             <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-red-400 text-sm font-medium">Interview Platform</span>
+            <span className="text-red-400 text-sm font-medium">Interview Studio</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Live Interview Studio</h1>
-          <p className="text-gray-400">AI-powered aptitude, coding rounds & live HR interviews</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">Live Interview Studio</h1>
+          <p className="text-gray-600 dark:text-gray-400">AI-powered aptitude, coding rounds & live HR interviews</p>
         </div>
 
         {/* Mode picker */}
@@ -442,11 +595,11 @@ export default function LiveInterview() {
           ].map(m => (
             <button key={m.id} id={`mode-${m.id}`} onClick={() => setMainMode(m.id)}
               className="relative p-6 rounded-2xl border-2 text-left transition-all"
-              style={{ borderColor: mainMode === m.id ? '#ef4444' : '#374151', background: mainMode === m.id ? 'rgba(239,68,68,0.08)' : '#111827' }}>
+              style={{ borderColor: mainMode === m.id ? '#ef4444' : (isDark ? '#374151' : '#e5e7eb'), background: mainMode === m.id ? 'rgba(239,68,68,0.08)' : (isDark ? '#111827' : '#ffffff'), color: isDark ? '#ffffff' : '#111827' }}>
               <div className="text-3xl mb-3">{m.icon}</div>
-              <div className="font-bold text-white text-lg">{m.title}</div>
-              <div className="text-gray-400 text-sm mt-1">{m.desc}</div>
-              <div className="mt-3 inline-block text-xs px-2 py-0.5 rounded-full" style={{ background: mainMode === m.id ? '#ef444430' : '#1f2937', color: mainMode === m.id ? '#f87171' : '#6b7280' }}>{m.badge}</div>
+              <div className="font-bold text-gray-900 dark:text-white text-lg">{m.title}</div>
+              <div className="text-gray-500 dark:text-gray-400 text-sm mt-1">{m.desc}</div>
+              <div className="mt-3 inline-block text-xs px-2 py-0.5 rounded-full" style={{ background: mainMode === m.id ? '#ef444430' : (isDark ? '#1f2937' : '#f3f4f6'), color: mainMode === m.id ? '#f87171' : (isDark ? '#6b7280' : '#4b5563') }}>{m.badge}</div>
               {mainMode === m.id && <div className="absolute top-4 right-4 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"><span className="text-white text-xs">✓</span></div>}
             </button>
           ))}
@@ -454,8 +607,8 @@ export default function LiveInterview() {
 
         {/* ── AI Interview sub-mode ── */}
         {mainMode === 'ai' && (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-5">
-            <h2 className="text-white font-semibold text-lg">Choose Interview Type</h2>
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 space-y-5">
+            <h2 className="text-gray-900 dark:text-white font-semibold text-lg">Choose Interview Type</h2>
             <div className="grid grid-cols-3 gap-3">
               {[
                 { id: 'aptitude', icon: '🧠', title: 'Aptitude', desc: '20 MCQ questions', color: '#6366f1' },
@@ -464,9 +617,9 @@ export default function LiveInterview() {
               ].map(s => (
                 <button key={s.id} id={`submode-${s.id}`} onClick={() => setAiSubMode(s.id)}
                   className="p-4 rounded-xl border text-center transition-all"
-                  style={{ borderColor: aiSubMode === s.id ? s.color : '#374151', background: aiSubMode === s.id ? s.color + '15' : '#111827' }}>
+                  style={{ borderColor: aiSubMode === s.id ? s.color : (isDark ? '#374151' : '#e5e7eb'), background: aiSubMode === s.id ? s.color + '15' : (isDark ? '#111827' : '#f9fafb') }}>
                   <div className="text-2xl mb-2">{s.icon}</div>
-                  <div className="font-semibold text-white text-sm">{s.title}</div>
+                  <div className="font-semibold text-gray-900 dark:text-white text-sm">{s.title}</div>
                   <div className="text-gray-500 text-xs mt-1">{s.desc}</div>
                 </button>
               ))}
@@ -573,88 +726,352 @@ export default function LiveInterview() {
   // RENDER: APTITUDE TEST
   // ══════════════════════════════════════════════════════════════════════════
   if (stage === 'aptitude') {
-    const pageStart = aptPage * QUESTIONS_PER_PAGE;
-    const pageEnd = Math.min(pageStart + QUESTIONS_PER_PAGE, aptitudeQuestions.length);
-    const pageQuestions = aptitudeQuestions.slice(pageStart, pageEnd);
-    const totalPages = Math.ceil(aptitudeQuestions.length / QUESTIONS_PER_PAGE);
-    const answeredAll = aptitudeQuestions.every(q => aptAnswers[q.id] !== undefined);
+    const currentSection = aptSections[currentSectionIdx];
+    if (!currentSection) return null;
+
+    const currentQuestion = currentSection.questions[currentAptQuestionIdx];
+    if (!currentQuestion) return null;
+
+    // Calculate total progress
+    let globalIndex = 0;
+    for (let sIdx = 0; sIdx < currentSectionIdx; sIdx++) {
+      globalIndex += aptSections[sIdx].questions.length;
+    }
+    globalIndex += currentAptQuestionIdx;
+
+    const answeredCount = Object.keys(aptAnswers).length;
+    const progressPercent = Math.round((globalIndex / aptitudeQuestions.length) * 100);
+
+    const isFirstQuestion = currentSectionIdx === 0 && currentAptQuestionIdx === 0;
+    const isLastQuestion = currentSectionIdx === aptSections.length - 1 && currentAptQuestionIdx === currentSection.questions.length - 1;
+
+    // Timer color styling (red if less than 5 minutes remain)
+    const timerColor = aptTotalTimeLeft <= 300 ? '#ef4444' : aptTotalTimeLeft <= 900 ? '#f59e0b' : '#10b981';
+
+    const totalDuration = aptitudeQuestions.length * 60;
+    const timePercentage = Math.round((aptTotalTimeLeft / totalDuration) * 100);
+
+    const formatTime = (seconds) => {
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      const hrsStr = hrs > 0 ? `${hrs}:` : '';
+      const minsStr = mins < 10 ? `0${mins}` : mins;
+      const secsStr = secs < 10 ? `0${secs}` : secs;
+      return `${hrsStr}${minsStr}:${secsStr}`;
+    };
 
     return (
-      <div className="min-h-screen bg-gray-950 p-4 md:p-8">
-        <div className="max-w-3xl mx-auto space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-white font-bold text-xl">🧠 Aptitude Test</h2>
-              <p className="text-gray-400 text-sm">Page {aptPage + 1} of {totalPages} · {aptitudeQuestions.length} questions total</p>
-            </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-400 mb-1">Answered</div>
-              <div className="text-white font-bold">{Object.keys(aptAnswers).length}/{aptitudeQuestions.length}</div>
-            </div>
-          </div>
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-start">
+        <div className="w-full flex flex-row gap-0 items-start">
+          
+          {/* LEFT SIDEBAR: Question Navigation Console */}
+          <div className="hidden lg:flex flex-col w-40 shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 overflow-y-auto" style={{ minHeight: '100vh', maxHeight: '100vh', position: 'sticky', top: 0 }}>
 
-          {/* Progress bar */}
-          <div className="w-full bg-gray-800 rounded-full h-2">
-            <div className="h-2 rounded-full transition-all" style={{ width: `${(Object.keys(aptAnswers).length / aptitudeQuestions.length) * 100}%`, background: 'linear-gradient(90deg, #6366f1, #ef4444)' }} />
-          </div>
-
-          {/* Questions */}
-          <div className="space-y-4">
-            {pageQuestions.map((q, i) => {
-              const globalIdx = pageStart + i;
+            {/* Section label + numbered circles */}
+            {(() => {
+              const sec = aptSections[currentSectionIdx];
+              if (!sec) return null;
               return (
-                <div key={q.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                        style={{ background: aptAnswers[q.id] !== undefined ? '#6366f1' : '#374151' }}>{globalIdx + 1}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full border text-indigo-400 border-indigo-500/30 bg-indigo-500/10">{q.category}</span>
-                    </div>
-                    {aptAnswers[q.id] !== undefined && <span className="text-green-400 text-xs">✓ Answered</span>}
+                <div className="flex-1 flex flex-col">
+                  <div className="px-4 py-3 flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{sec.section}</span>
                   </div>
-                  <p className="text-white text-sm font-medium mb-4">{q.question}</p>
-                  <div className="space-y-2">
-                    {q.options.map((opt, oi) => (
-                      <button key={oi} id={`q${q.id}-opt${oi}`}
-                        onClick={() => setAptAnswers(prev => ({ ...prev, [q.id]: oi }))}
-                        className="w-full text-left px-4 py-3 rounded-xl border text-sm transition-all"
-                        style={{
-                          borderColor: aptAnswers[q.id] === oi ? '#6366f1' : '#374151',
-                          background: aptAnswers[q.id] === oi ? '#6366f115' : '#111827',
-                          color: aptAnswers[q.id] === oi ? '#a5b4fc' : '#9ca3af'
-                        }}>
-                        <span className="font-medium mr-2">{String.fromCharCode(65 + oi)}.</span>{opt}
-                      </button>
-                    ))}
+
+                  {/* 2-column grid of numbered boxes — medium fixed size */}
+                  <div className="grid grid-cols-2 gap-2 px-3 pb-4 justify-items-center">
+                    {sec.questions.map((q, qIdx) => {
+                      let gIdx = 0;
+                      for (let pIdx = 0; pIdx < currentSectionIdx; pIdx++) {
+                        gIdx += aptSections[pIdx].questions.length;
+                      }
+                      gIdx += qIdx;
+
+                      const isSelected = currentAptQuestionIdx === qIdx;
+                      const isAnswered = aptAnswers[q.id] !== undefined;
+
+                      let btnClass = '';
+                      if (isSelected) {
+                        btnClass = 'bg-indigo-600 border-2 border-indigo-400 text-white shadow-md shadow-indigo-500/20';
+                      } else if (isAnswered) {
+                        btnClass = 'bg-emerald-500 border-2 border-emerald-600 text-white shadow-sm';
+                      } else {
+                        btnClass = 'bg-gray-200 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700';
+                      }
+
+                      return (
+                        <button
+                          key={q.id}
+                          onClick={() => setCurrentAptQuestionIdx(qIdx)}
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold transition-all hover:opacity-90 ${btnClass}`}
+                        >
+                          {gIdx + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Legend */}
+                  <div className="mt-auto border-t border-gray-200 dark:border-gray-800 px-4 py-3 space-y-1.5">
+                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                      <span className="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold bg-indigo-600 text-white">1</span>
+                      <span>Active</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                      <span className="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold bg-emerald-500 text-white">2</span>
+                      <span>Answered</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                      <span className="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500">3</span>
+                      <span>Not Visited</span>
+                    </div>
                   </div>
                 </div>
               );
-            })}
+            })()}
           </div>
 
-          {/* Navigation */}
-          <div className="flex items-center justify-between pt-2">
-            <button onClick={() => setAptPage(p => Math.max(p - 1, 0))} disabled={aptPage === 0}
-              className="px-6 py-2.5 rounded-xl border border-gray-700 text-gray-400 text-sm disabled:opacity-30 hover:bg-gray-800 transition-all">
-              ← Previous
-            </button>
-            {aptPage < totalPages - 1 ? (
-              <button id="apt-next" onClick={() => setAptPage(p => p + 1)}
-                className="px-6 py-2.5 rounded-xl font-semibold text-white text-sm transition-all"
-                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-                Next Page →
+          {/* RIGHT MAIN COLUMN: Active Question panel */}
+          <div className="flex-1 w-full space-y-6 p-4 md:p-8 overflow-y-auto" style={{ minHeight: '100vh' }}>
+            
+            {/* Header Dashboard Card */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+
+              {/* LEFT: Section info + section timer */}
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0" style={{ background: '#6366f120', border: '1px solid #6366f130' }}>
+                  {currentSection.icon || '📝'}
+                </div>
+                <div>
+                  <h2 className="text-gray-900 dark:text-white font-bold text-lg">{currentSection.section} Section</h2>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs">
+                    Question {currentAptQuestionIdx + 1} of {currentSection.questions.length} in this section
+                  </p>
+                </div>
+                {/* Per-section timer pill */}
+                <div className="ml-2 px-3 py-1.5 rounded-xl border flex flex-col items-center"
+                  style={{
+                    background: aptSectionTimeLeft <= 60 ? '#ef444415' : '#6366f110',
+                    borderColor: aptSectionTimeLeft <= 60 ? '#ef444440' : '#6366f130'
+                  }}>
+                  <span className="text-[9px] font-bold uppercase tracking-wider"
+                    style={{ color: aptSectionTimeLeft <= 60 ? '#ef4444' : '#6366f1' }}>
+                    Section Time
+                  </span>
+                  <span className="text-sm font-bold font-mono"
+                    style={{ color: aptSectionTimeLeft <= 60 ? '#ef4444' : aptSectionTimeLeft <= 300 ? '#f59e0b' : '#6366f1' }}>
+                    {formatTime(aptSectionTimeLeft)}
+                  </span>
+                </div>
+              </div>
+
+              {/* RIGHT: Total timer + Submit button */}
+              <div className="flex items-center gap-3 self-end md:self-auto">
+                {/* Total exam time */}
+                <div className="flex flex-col items-end">
+                  <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Total Time</span>
+                  <span className="text-base font-bold font-mono" style={{ color: timerColor }}>
+                    {formatTime(aptTotalTimeLeft)}
+                  </span>
+                </div>
+                {/* Thin ring for total */}
+                <div className="relative w-10 h-10 shrink-0">
+                  <svg viewBox="0 0 36 36" className="w-10 h-10 -rotate-90">
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke={aptTotalTimeLeft <= 300 ? '#ef444420' : '#1f293740'} strokeWidth="3"/>
+                    <circle cx="18" cy="18" r="15.9" fill="none"
+                      stroke={timerColor}
+                      strokeWidth="3"
+                      strokeDasharray={`${timePercentage} 100`}
+                      style={{ transition: 'stroke-dasharray 1s linear' }}
+                    />
+                  </svg>
+                </div>
+                {/* Submit Section button */}
+                <button
+                  id="btn-submit-section"
+                  onClick={() => { setShowSectionConfirm(true); setSectionConfirmInput(''); }}
+                  disabled={aptSubmitting}
+                  className="px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50"
+                  style={{
+                    background: currentSectionIdx >= aptSections.length - 1
+                      ? 'linear-gradient(135deg, #10b981, #059669)'
+                      : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    boxShadow: currentSectionIdx >= aptSections.length - 1
+                      ? '0 4px 14px rgba(16,185,129,0.3)'
+                      : '0 4px 14px rgba(245,158,11,0.3)'
+                  }}
+                >
+                  {aptSubmitting
+                    ? 'Submitting...'
+                    : currentSectionIdx >= aptSections.length - 1
+                      ? 'Submit Exam'
+                      : 'Submit Section →'}
+                </button>
+              </div>
+            </div>
+
+
+            {/* Overall progress bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-gray-500 font-medium">
+                <span>Overall Progress</span>
+                <span>{answeredCount} / {aptitudeQuestions.length} answered ({progressPercent}%)</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded-full h-2">
+                <div className="h-full rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercent}%`, background: 'linear-gradient(90deg, #6366f1, #ef4444)' }} />
+              </div>
+            </div>
+
+            {/* Question Card */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs px-2.5 py-1 rounded-md font-bold uppercase tracking-wide bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  Question {globalIndex + 1}
+                </span>
+                {aptAnswers[currentQuestion.id] !== undefined && (
+                  <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                    <span>✓ Answer Saved</span>
+                  </span>
+                )}
+              </div>
+
+              <p className="text-gray-900 dark:text-white text-lg font-medium leading-relaxed">
+                {currentQuestion.question}
+              </p>
+
+              <div className="grid grid-cols-1 gap-3">
+                {currentQuestion.options.map((opt, oi) => {
+                  const isSelected = aptAnswers[currentQuestion.id] === oi;
+                  return (
+                    <button key={oi} id={`q-${currentQuestion.id}-opt-${oi}`}
+                      onClick={() => setAptAnswers(prev => ({ ...prev, [currentQuestion.id]: oi }))}
+                      className={`w-full text-left px-5 py-4 rounded-xl border text-sm transition-all flex items-center justify-between ${
+                        isSelected
+                          ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-400 dark:border-indigo-500 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-500/20'
+                          : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}>
+                      <span className="flex items-center gap-3">
+                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs border ${
+                          isSelected
+                            ? 'border-indigo-400 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300'
+                            : 'border-gray-300 dark:border-gray-700 bg-gray-200 dark:bg-gray-800 text-gray-500'
+                        }`}>
+                          {String.fromCharCode(65 + oi)}
+                        </span>
+                        <span>{opt}</span>
+                      </span>
+                      {isSelected && <span className="text-indigo-500 dark:text-indigo-400 text-xs font-bold">●</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Navigation Controls */}
+            <div className="flex items-center justify-between gap-4 pt-2">
+              <button onClick={handlePrevAptQuestion} disabled={isFirstQuestion}
+                className="px-6 py-3 rounded-xl border border-gray-300 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed">
+                ← Previous
               </button>
-            ) : (
-              <button id="apt-submit" onClick={submitAptitude} disabled={aptSubmitting}
-                className="px-6 py-2.5 rounded-xl font-semibold text-white text-sm disabled:opacity-50 transition-all"
-                style={{ background: answeredAll ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #6366f1, #ef4444)' }}>
-                {aptSubmitting ? 'Submitting...' : answeredAll ? '✅ Submit All Answers' : `Submit (${Object.keys(aptAnswers).length}/${aptitudeQuestions.length} answered)`}
+              
+              {isLastQuestion ? (
+                <button id="apt-submit" onClick={submitAptitude} disabled={aptSubmitting}
+                  className="px-8 py-3 rounded-xl font-bold text-white text-sm transition-all shadow-lg hover:shadow-emerald-500/20"
+                  style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                  {aptSubmitting ? 'Submitting Test...' : '🏁 Submit Exam'}
+                </button>
+              ) : (
+                <button id="apt-next" onClick={handleNextAptQuestion}
+                  className="px-8 py-3 rounded-xl font-bold text-white text-sm transition-all shadow-lg hover:shadow-indigo-500/20"
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                  Next Question →
+                </button>
+              )}
+            </div>
+
+            <div className="text-center pt-2">
+              <button onClick={resetAll} className="text-gray-600 text-xs hover:text-gray-400 transition-all font-medium">
+                ← Exit and Back to Setup
               </button>
-            )}
+            </div>
           </div>
-          <button onClick={resetAll} className="text-gray-600 text-xs hover:text-gray-400 transition-all">← Back to Setup</button>
         </div>
+
+        {/* ── Section Confirm Modal ── */}
+        {showSectionConfirm && (() => {
+          const isLastSection = currentSectionIdx >= aptSections.length - 1;
+          const currentSecName = aptSections[currentSectionIdx]?.section || '';
+          const nextSecName = !isLastSection ? aptSections[currentSectionIdx + 1]?.section : null;
+          const isMatch = sectionConfirmInput.trim() === currentSecName;
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            >
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+                <div className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold"
+                      style={{ background: isLastSection ? '#10b98120' : '#f59e0b20', border: `1px solid ${isLastSection ? '#10b98140' : '#f59e0b40'}`, color: isLastSection ? '#10b981' : '#f59e0b' }}>
+                      {isLastSection ? '#' : '>'}
+                    </div>
+                    <div>
+                      <h3 className="text-gray-900 dark:text-white font-bold text-base">
+                        {isLastSection ? 'Submit Exam' : 'Submit Section & Continue'}
+                      </h3>
+                      <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">
+                        {isLastSection ? 'This will end your exam and submit all answers.' : `Next: ${nextSecName} section`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-6 py-5 space-y-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Type <strong className="text-gray-900 dark:text-white font-bold">{currentSecName}</strong> to confirm:
+                  </p>
+                  <input
+                    id="section-confirm-input"
+                    type="text"
+                    value={sectionConfirmInput}
+                    onChange={e => setSectionConfirmInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && isMatch) { setShowSectionConfirm(false); setSectionConfirmInput(''); handleSubmitSection(); } }}
+                    placeholder={`Type "${currentSecName}" here`}
+                    autoFocus
+                    className={`w-full px-4 py-3 rounded-xl border text-sm outline-none transition-all bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 ${
+                      sectionConfirmInput.length === 0 ? 'border-gray-300 dark:border-gray-700'
+                        : isMatch ? 'border-emerald-500 ring-1 ring-emerald-500/30'
+                        : 'border-red-400 ring-1 ring-red-400/30'
+                    }`}
+                  />
+                  {sectionConfirmInput.length > 0 && !isMatch && (
+                    <p className="text-xs text-red-500">Section name does not match. Please try again.</p>
+                  )}
+                  {isMatch && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">✓ Confirmed! Click the button below to proceed.</p>
+                  )}
+                </div>
+                <div className="px-6 pb-6 flex gap-3">
+                  <button
+                    onClick={() => { setShowSectionConfirm(false); setSectionConfirmInput(''); }}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="confirm-section-submit"
+                    disabled={!isMatch || aptSubmitting}
+                    onClick={() => { setShowSectionConfirm(false); setSectionConfirmInput(''); handleSubmitSection(); }}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{ background: isLastSection ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                  >
+                    {aptSubmitting ? 'Submitting...' : isLastSection ? 'Submit Exam' : `Go to ${nextSecName}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   }
@@ -667,51 +1084,63 @@ export default function LiveInterview() {
     if (!prob) return null;
 
     return (
-      <div className="h-screen bg-gray-950 flex flex-col overflow-hidden">
+      <div className="h-screen bg-gray-50 dark:bg-gray-950 flex flex-col overflow-hidden transition-colors duration-300">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-800" style={{ background: '#111827' }}>
+        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           <div className="flex items-center gap-4">
-            <h2 className="text-white font-bold">💻 Coding Round</h2>
-            <span className="text-gray-500 text-sm">Problem {codingProblemIndex + 1} of {codingProblems.length}</span>
+            <h2 className="text-gray-900 dark:text-white font-bold">💻 Coding Round</h2>
+            <span className="text-gray-500 dark:text-gray-400 text-sm">Problem {codingProblemIndex + 1} of {codingProblems.length}</span>
+            <span className="px-2.5 py-1 rounded-md text-xs font-bold font-mono animate-pulse"
+              style={{
+                backgroundColor: codingTimeLeft <= 180 ? '#ef444420' : 'rgba(245, 158, 11, 0.1)',
+                color: codingTimeLeft <= 180 ? '#ef4444' : '#fbbf24',
+                border: codingTimeLeft <= 180 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)'
+              }}>
+              ⏳ {Math.floor(codingTimeLeft / 60)}:{codingTimeLeft % 60 < 10 ? `0${codingTimeLeft % 60}` : codingTimeLeft % 60}
+            </span>
           </div>
           <div className="flex items-center gap-3">
             {codingResults.length > 0 && (
-              <span className="text-green-400 text-xs font-medium">{codingResults.length} solved</span>
+              <span className="text-green-500 dark:text-green-400 text-xs font-medium">{codingResults.length} solved</span>
             )}
-            <button onClick={resetAll} className="text-gray-500 hover:text-gray-300 text-sm transition-all">✕ Exit</button>
+            <button onClick={resetAll} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-sm transition-all">✕ Exit</button>
           </div>
         </div>
 
         {/* Main panel */}
         <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 57px)' }}>
           {/* Left: Problem statement */}
-          <div className="w-2/5 border-r border-gray-800 overflow-y-auto p-5 space-y-4" style={{ background: '#111827' }}>
+          <div className="w-2/5 border-r border-gray-200 dark:border-gray-800 overflow-y-auto p-5 space-y-4 bg-white dark:bg-gray-900">
             <div className="flex items-center gap-2">
-              <h3 className="text-white font-bold text-lg">{prob.title}</h3>
+              <h3 className="text-gray-900 dark:text-white font-bold text-lg">{prob.title}</h3>
               <DiffBadge d={prob.difficulty} />
             </div>
 
-            <pre className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed font-sans">{prob.description}</pre>
+            <pre className="text-gray-700 dark:text-gray-300 text-sm whitespace-pre-wrap leading-relaxed font-sans">{prob.description}</pre>
 
             {/* Problem progress */}
-            <div className="pt-3 border-t border-gray-800">
+            <div className="pt-3 border-t border-gray-200 dark:border-gray-800">
               <p className="text-gray-500 text-xs mb-2">Progress</p>
               <div className="flex gap-2">
-                {codingProblems.map((_, i) => (
-                  <div key={i} className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                    style={{
-                      background: codingResults.find(r => r.problemId === i) ? '#22c55e' : i === codingProblemIndex ? '#6366f1' : '#374151',
-                      color: 'white'
-                    }}>{i + 1}</div>
-                ))}
+                {codingProblems.map((_, i) => {
+                  const isSolved = codingResults.find(r => r.problemId === i);
+                  const isCurrent = i === codingProblemIndex;
+                  return (
+                    <div key={i} className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all"
+                      style={{
+                        background: isSolved ? '#22c55e' : isCurrent ? '#6366f1' : (isDark ? '#374151' : '#e5e7eb'),
+                        color: (isSolved || isCurrent) ? 'white' : (isDark ? '#9ca3af' : '#4b5563')
+                      }}>{i + 1}</div>
+                  );
+                })}
               </div>
             </div>
 
             {/* Evaluation result */}
             {codingEval && (
-              <div className="bg-gray-800 rounded-xl p-4 space-y-3 border border-gray-700">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 space-y-3 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-white">AI Evaluation</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">AI Evaluation</span>
                   <span className="text-lg font-bold" style={{ color: codingEval.score >= 7 ? '#22c55e' : codingEval.score >= 4 ? '#f59e0b' : '#ef4444' }}>
                     {codingEval.score}/10
                   </span>
@@ -720,25 +1149,25 @@ export default function LiveInterview() {
                   style={{ background: codingEval.verdict === 'Correct' ? '#22c55e20' : codingEval.verdict === 'Partially Correct' ? '#f59e0b20' : '#ef444420', color: codingEval.verdict === 'Correct' ? '#4ade80' : codingEval.verdict === 'Partially Correct' ? '#fbbf24' : '#f87171' }}>
                   {codingEval.verdict}
                 </div>
-                <p className="text-gray-300 text-xs leading-relaxed">{codingEval.feedback}</p>
-                {codingEval.hints && <p className="text-blue-400 text-xs">💡 {codingEval.hints}</p>}
-                {codingEval.timeComplexity && <p className="text-gray-500 text-xs">⏱ Time: {codingEval.timeComplexity}</p>}
+                <p className="text-gray-600 dark:text-gray-300 text-xs leading-relaxed">{codingEval.feedback}</p>
+                {codingEval.hints && <p className="text-blue-600 dark:text-blue-400 text-xs font-medium">💡 {codingEval.hints}</p>}
+                {codingEval.timeComplexity && <p className="text-gray-400 dark:text-gray-500 text-xs">⏱ Time: {codingEval.timeComplexity}</p>}
 
                 <div className="flex gap-2 pt-1">
                   {codingProblemIndex < codingProblems.length - 1 ? (
                     <button id="btn-next-problem" onClick={nextCodingProblem}
-                      className="flex-1 py-2 rounded-lg text-sm font-semibold text-white"
+                      className="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
                       style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
                       Next Problem →
                     </button>
                   ) : (
                     <button id="btn-finish-coding" onClick={() => { setStage('result'); setResult({ type: 'coding', results: codingResults }); }}
-                      className="flex-1 py-2 rounded-lg text-sm font-semibold text-white"
+                      className="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
                       style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}>
                       🏁 Finish Round
                     </button>
                   )}
-                  <button onClick={() => setCodingEval(null)} className="px-4 py-2 rounded-lg text-sm text-gray-400 border border-gray-700 hover:bg-gray-700 transition-all">
+                  <button onClick={() => setCodingEval(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-450 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all">
                     Try Again
                   </button>
                 </div>
@@ -747,7 +1176,7 @@ export default function LiveInterview() {
           </div>
 
           {/* Right: Code editor + LeetCode drawer */}
-          <div className="flex-grow flex flex-col relative overflow-hidden" style={{ background: '#1e1e1e' }}>
+          <div className="flex-grow flex flex-col relative overflow-hidden bg-white dark:bg-gray-950">
             {/* Monaco Editor Container */}
             <div className="flex-1 overflow-hidden relative transition-all duration-150">
               <CodeEditor language={codingLanguage} value={codingCode} onChange={setCodingCode} onLanguageChange={handleLanguageChange} />
@@ -755,23 +1184,23 @@ export default function LiveInterview() {
 
             {/* Collapsible Console Drawer */}
             {/* Collapsible Console Drawer */}
-            <div className="border-t border-gray-800 bg-[#141414] flex flex-col transition-all duration-150" style={{ height: consoleOpen ? '300px' : 'auto' }}>
+            <div className="border-t border-gray-200 dark:border-gray-800 bg-[#f9fafb] dark:bg-[#141414] flex flex-col transition-all duration-150" style={{ height: consoleOpen ? '300px' : 'auto' }}>
               {/* Drawer Header (Unified Action Bar) */}
-              <div className="flex items-center justify-between px-4 py-2 bg-[#1c1c1c] border-b border-gray-800 select-none">
+              <div className="flex items-center justify-between px-4 py-2 bg-gray-100 dark:bg-[#1c1c1c] border-b border-gray-200 dark:border-gray-800 select-none">
                 <div className="flex items-center gap-4">
-                  <span className="text-gray-300 hover:text-white font-semibold text-xs flex items-center gap-1 cursor-pointer" onClick={() => setConsoleOpen(!consoleOpen)}>
+                  <span className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-semibold text-xs flex items-center gap-1 cursor-pointer" onClick={() => setConsoleOpen(!consoleOpen)}>
                     <span>Console</span>
                     <span className="text-[10px]">{consoleOpen ? '▼' : '▲'}</span>
                   </span>
 
                   {consoleOpen && (
-                    <div className="flex items-center gap-2 border-l border-gray-800 pl-4">
+                    <div className="flex items-center gap-2 border-l border-gray-300 dark:border-gray-800 pl-4">
                       <button type="button" onClick={() => setConsoleTab('testcases')}
-                        className={`text-xs px-3 py-1 rounded-md font-semibold transition-all ${consoleTab === 'testcases' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'}`}>
+                        className={`text-xs px-3 py-1 rounded-md font-semibold transition-all ${consoleTab === 'testcases' ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-gray-300 dark:border-transparent' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
                         Testcase
                       </button>
                       <button type="button" onClick={() => setConsoleTab('result')}
-                        className={`text-xs px-3 py-1 rounded-md font-semibold transition-all ${consoleTab === 'result' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'}`}>
+                        className={`text-xs px-3 py-1 rounded-md font-semibold transition-all ${consoleTab === 'result' ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-gray-300 dark:border-transparent' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
                         Result
                       </button>
                     </div>
@@ -784,10 +1213,10 @@ export default function LiveInterview() {
                       {runResult.verdict}
                     </span>
                   )}
-                  {error && <p className="text-red-400 text-xs truncate max-w-[200px]" title={error}>{error}</p>}
+                  {error && <p className="text-red-500 dark:text-red-400 text-xs truncate max-w-[200px]" title={error}>{error}</p>}
                   
                   <button type="button" onClick={runCode} disabled={codeRunning || codingSubmitting}
-                    className="px-4 py-1.5 rounded-lg bg-[#2d2d2d] hover:bg-[#3d3d3d] text-gray-300 hover:text-white text-xs font-bold transition-all border border-gray-700 disabled:opacity-40">
+                    className="px-4 py-1.5 rounded-lg bg-white dark:bg-[#2d2d2d] hover:bg-gray-50 dark:hover:bg-[#3d3d3d] text-gray-700 dark:text-gray-300 text-xs font-bold transition-all border border-gray-300 dark:border-gray-700 disabled:opacity-40">
                     Run Code
                   </button>
 
@@ -803,28 +1232,28 @@ export default function LiveInterview() {
 
               {/* Drawer Body (Content) */}
               {consoleOpen && (
-                <div className="flex-1 p-4 overflow-y-auto min-h-0 text-sm text-gray-300 font-sans">
+                <div className="flex-1 p-4 overflow-y-auto min-h-0 text-sm text-gray-700 dark:text-gray-300 font-sans">
                   {consoleTab === 'testcases' ? (
                     <div className="space-y-4">
                       {/* Case Selectors */}
                       <div className="flex gap-2">
                         {prob.testCases?.map((_, idx) => (
                           <button key={idx} type="button" onClick={() => setActiveTestcaseIdx(idx)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${activeTestcaseIdx === idx ? 'bg-gray-800 text-indigo-400 border border-indigo-500/30' : 'bg-[#242424] text-gray-400 hover:text-white'}`}>
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${activeTestcaseIdx === idx ? 'bg-white dark:bg-gray-800 text-indigo-650 dark:text-indigo-400 border border-indigo-450/30 dark:border-indigo-500/30' : 'bg-gray-200 dark:bg-[#242424] text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
                             Case {idx + 1}
                           </button>
                         ))}
                       </div>
 
                       {prob.testCases?.[activeTestcaseIdx] && (
-                        <div className="space-y-3 bg-[#1c1c1c] p-3 rounded-xl border border-gray-800">
+                        <div className="space-y-3 bg-white dark:bg-[#1c1c1c] p-3 rounded-xl border border-gray-200 dark:border-gray-800">
                           <div>
                             <div className="text-[10px] text-gray-500 font-bold mb-1 uppercase tracking-wider">Input</div>
-                            <pre className="bg-[#111] p-2 rounded-lg text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap">{prob.testCases[activeTestcaseIdx].input}</pre>
+                            <pre className="bg-gray-50 dark:bg-[#111] p-2 rounded-lg text-xs font-mono text-gray-700 dark:text-gray-300 overflow-x-auto whitespace-pre-wrap border border-gray-150 dark:border-transparent">{prob.testCases[activeTestcaseIdx].input}</pre>
                           </div>
                           <div>
                             <div className="text-[10px] text-gray-500 font-bold mb-1 uppercase tracking-wider">Expected Output</div>
-                            <pre className="bg-[#111] p-2 rounded-lg text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap">{prob.testCases[activeTestcaseIdx].expected}</pre>
+                            <pre className="bg-gray-50 dark:bg-[#111] p-2 rounded-lg text-xs font-mono text-gray-700 dark:text-gray-300 overflow-x-auto whitespace-pre-wrap border border-gray-150 dark:border-transparent">{prob.testCases[activeTestcaseIdx].expected}</pre>
                           </div>
                         </div>
                       )}
@@ -904,60 +1333,91 @@ export default function LiveInterview() {
   // RENDER: RESULT (Aptitude or Coding)
   // ══════════════════════════════════════════════════════════════════════════
   if (stage === 'result' && (result?.type === 'aptitude' || aptResult)) {
-    const r = aptResult;
-    const cats = r?.categoryScores || {};
+    const feedbackQuestions = [
+      "How was your overall experience with the assessment?",
+      "How would you rate the difficulty level of the questions?",
+      "Was the allocated time sufficient for the sections?",
+      "How would you rate the interface and usability?",
+      "How relevant were the questions to the specified skills?"
+    ];
+
     return (
-      <div className="min-h-screen bg-gray-950 p-4 md:p-8">
-        <div className="max-w-3xl mx-auto space-y-6">
-          <div className="text-center space-y-4">
-            <div className="text-4xl">{r.totalScore >= 70 ? '🏆' : r.totalScore >= 40 ? '📊' : '📚'}</div>
-            <h2 className="text-white text-2xl font-bold">Aptitude Test Complete!</h2>
-            <div className="flex justify-center"><ScoreRing score={r.totalScore} size={140} /></div>
-            <p className="text-gray-400">{r.correct} correct out of {r.total} questions</p>
-          </div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 md:p-8 flex items-center justify-center transition-colors duration-300">
+        <div className="max-w-2xl w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+          {/* Decorative background blur */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none"></div>
 
-          {/* Category breakdown */}
-          <div className="grid grid-cols-2 gap-3">
-            {Object.entries(cats).map(([cat, s]) => (
-              <div key={cat} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                <div className="text-gray-400 text-xs mb-2">{cat}</div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-white font-bold">{s.correct}/{s.total}</span>
-                  <span className="text-sm font-semibold" style={{ color: (s.correct / s.total) >= 0.7 ? '#22c55e' : (s.correct / s.total) >= 0.4 ? '#f59e0b' : '#ef4444' }}>
-                    {Math.round((s.correct / s.total) * 100)}%
-                  </span>
+          {!feedbackSubmitted ? (
+            <div className="relative z-10 space-y-8">
+              <div className="text-center space-y-3">
+                <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+                  <span className="text-4xl">🎉</span>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-1.5">
-                  <div className="h-1.5 rounded-full transition-all" style={{ width: `${(s.correct / s.total) * 100}%`, background: (s.correct / s.total) >= 0.7 ? '#22c55e' : (s.correct / s.total) >= 0.4 ? '#f59e0b' : '#ef4444' }} />
-                </div>
+                <h2 className="text-gray-900 dark:text-white text-3xl font-extrabold tracking-tight">Your assessment was successfully submitted!</h2>
+                <p className="text-emerald-500 dark:text-emerald-400 font-medium text-sm px-4 py-2 bg-emerald-500/10 inline-block rounded-full border border-emerald-500/20">
+                  Result will be published on your registered email.
+                </p>
+                <p className="text-gray-650 dark:text-gray-400 text-sm mt-2">
+                  Please take a moment to provide your feedback before leaving.
+                </p>
               </div>
-            ))}
-          </div>
 
-          {/* Review answers */}
-          {r.results && (
-            <div className="space-y-3">
-              <h3 className="text-white font-semibold">Answer Review</h3>
-              {r.results.map((q, i) => (
-                <div key={q.id} className="bg-gray-900 border rounded-xl p-4 text-sm"
-                  style={{ borderColor: q.isCorrect ? '#22c55e40' : '#ef444440' }}>
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-gray-300 flex-1">{i + 1}. {q.question}</p>
-                    <span>{q.isCorrect ? '✅' : '❌'}</span>
+              <div className="space-y-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+                <h3 className="text-gray-900 dark:text-white font-bold text-lg mb-4">Feedback</h3>
+                {feedbackQuestions.map((q, qIdx) => (
+                  <div key={qIdx} className="space-y-2">
+                    <p className="text-gray-700 dark:text-gray-300 text-sm font-medium">{qIdx + 1}. {q}</p>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={() => {
+                            const newRatings = [...feedbackRatings];
+                            newRatings[qIdx] = star;
+                            setFeedbackRatings(newRatings);
+                          }}
+                          className={`text-2xl transition-all hover:scale-110 ${
+                            feedbackRatings[qIdx] >= star ? 'text-yellow-400' : 'text-gray-350 dark:text-gray-700'
+                          }`}
+                        >
+                          ★
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  {!q.isCorrect && (
-                    <p className="text-green-400 text-xs mt-2">✓ Correct: {q.correctOption}</p>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
+
+              <div className="pt-6">
+                <button
+                  onClick={() => setFeedbackSubmitted(true)}
+                  disabled={feedbackRatings.includes(0)}
+                  className="w-full py-4 rounded-xl font-bold text-white text-base transition-all shadow-lg hover:shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+                >
+                  Submit Feedback
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative z-10 text-center space-y-6 py-12">
+              <div className="w-24 h-24 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/20">
+                <span className="text-5xl">❤️</span>
+              </div>
+              <h2 className="text-gray-900 dark:text-white text-3xl font-extrabold tracking-tight">Thank You!</h2>
+              <p className="text-gray-650 dark:text-gray-400 text-base max-w-md mx-auto">
+                Your feedback has been recorded. You can now safely close this window or return to the dashboard.
+              </p>
+              <div className="pt-8">
+                <button
+                  onClick={() => window.location.href = '/'}
+                  className="px-8 py-3 rounded-xl border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-white font-semibold hover:bg-gray-100 dark:hover:bg-gray-850 transition-all"
+                >
+                  Return to Dashboard
+                </button>
+              </div>
             </div>
           )}
-
-          <button id="btn-retake" onClick={resetAll}
-            className="w-full py-3 rounded-xl font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #ef4444)' }}>
-            🔄 Try Again / New Test
-          </button>
         </div>
       </div>
     );
@@ -967,28 +1427,28 @@ export default function LiveInterview() {
     const results = result.results || [];
     const avg = results.length > 0 ? Math.round(results.reduce((s, r) => s + (r.score || 0), 0) / results.length * 10) : 0;
     return (
-      <div className="min-h-screen bg-gray-950 p-4 md:p-8">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 md:p-8 transition-colors duration-300">
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="text-center space-y-4">
             <div className="text-4xl">{avg >= 70 ? '🏆' : avg >= 40 ? '💪' : '📚'}</div>
-            <h2 className="text-white text-2xl font-bold">Coding Round Complete!</h2>
+            <h2 className="text-gray-900 dark:text-white text-2xl font-bold">Coding Round Complete!</h2>
             <div className="flex justify-center"><ScoreRing score={avg} size={140} /></div>
-            <p className="text-gray-400">{results.length} problems attempted · Average score {avg}/100</p>
+            <p className="text-gray-600 dark:text-gray-400">{results.length} problems attempted · Average score {avg}/100</p>
           </div>
           <div className="space-y-3">
             {results.map((r, i) => (
-              <div key={i} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+              <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white font-medium">{r.title}</span>
+                  <span className="text-gray-900 dark:text-white font-medium">{r.title}</span>
                   <span className="font-bold text-lg" style={{ color: r.score >= 7 ? '#22c55e' : r.score >= 4 ? '#f59e0b' : '#ef4444' }}>{r.score}/10</span>
                 </div>
                 <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: r.verdict === 'Correct' ? '#22c55e20' : '#f59e0b20', color: r.verdict === 'Correct' ? '#4ade80' : '#fbbf24' }}>{r.verdict}</span>
-                {r.feedback && <p className="text-gray-400 text-xs mt-2">{r.feedback}</p>}
+                {r.feedback && <p className="text-gray-655 dark:text-gray-400 text-xs mt-2">{r.feedback}</p>}
               </div>
             ))}
           </div>
           <button id="btn-coding-retry" onClick={resetAll}
-            className="w-full py-3 rounded-xl font-semibold text-white"
+            className="w-full py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90"
             style={{ background: 'linear-gradient(135deg, #6366f1, #ef4444)' }}>
             🔄 Try Again
           </button>
@@ -1001,63 +1461,106 @@ export default function LiveInterview() {
   // RENDER: WAITING ROOM
   // ══════════════════════════════════════════════════════════════════════════
   if (stage === 'waiting') return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4 transition-colors duration-300">
       <div className="max-w-2xl w-full mx-auto space-y-4">
 
         {/* AI self-practice: show loading spinner */}
         {role === 'student' ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center space-y-6">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center space-y-6 shadow-xl">
             <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-4xl animate-bounce" style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)' }}>🤖</div>
             <div>
-              <h2 className="text-white font-bold text-xl mb-2">AI is Preparing Your Interview</h2>
-              <p className="text-gray-400 text-sm">Generating personalized questions from your resume...</p>
+              <h2 className="text-gray-900 dark:text-white font-bold text-xl mb-2">AI is Preparing Your Interview</h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Generating personalized questions from your resume...</p>
             </div>
             <div className="flex justify-center gap-1.5">
               {[0, 1, 2, 3].map(i => (
                 <div key={i} className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
               ))}
             </div>
-            <p className="text-gray-600 text-xs">This will only take a moment...</p>
+            <p className="text-gray-500 dark:text-gray-600 text-xs">This will only take a moment...</p>
           </div>
         ) : (
           /* HR/Admin room: show Room ID sharing panel */
           <>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-5">
-              <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-3xl" style={{ background: '#ef444420' }}>🎙️</div>
-              <h2 className="text-white font-bold text-xl">Interview Room Ready</h2>
-              <p className="text-gray-400 text-sm">Share the Room ID with the interviewer/candidate</p>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 text-center space-y-5 relative shadow-xl">
 
-              <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-                <p className="text-gray-400 text-xs mb-1">Room ID</p>
-                <p className="text-white text-2xl font-bold font-mono tracking-wider">{roomId}</p>
-              </div>
+              {/* ── Close / Exit button ── */}
+              <button id="btn-close-room" onClick={resetAll}
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-all text-lg">
+                ✕
+              </button>
 
-              <div className="flex gap-3 justify-center">
-                <button id="btn-copy-room" onClick={handleCopyRoomId}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-700 text-gray-300 hover:bg-gray-800 transition-all">
-                  {copyText}
-                </button>
-                <a href={`https://wa.me/?text=Join my interview: Room ID ${roomId}`} target="_blank" rel="noreferrer"
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-all">
-                  WhatsApp 📲
-                </a>
-              </div>
+              {isRoomCreator ? (
+                /* Admin who created the room */
+                <>
+                  <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-3xl" style={{ background: '#ef444420' }}>🎙️</div>
+                  <h2 className="text-gray-900 dark:text-white font-bold text-xl">Interview Room Ready</h2>
+                  <p className="text-gray-650 dark:text-gray-400 text-sm">Share the Room ID with the candidate to let them join</p>
 
-              <div className="flex items-center gap-2 justify-center">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-                <span className="text-yellow-400 text-sm">Waiting for participants... ({participants.length} joined)</span>
-              </div>
+                  <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+                    <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Room ID</p>
+                    <p className="text-gray-900 dark:text-white text-2xl font-bold font-mono tracking-wider">{roomId}</p>
+                  </div>
+
+                  <div className="flex gap-3 justify-center">
+                    <button id="btn-copy-room" onClick={handleCopyRoomId}
+                      className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-700 text-gray-300 hover:bg-gray-800 transition-all">
+                      {copyText}
+                    </button>
+                    <a href={`https://wa.me/?text=Join my SmartHire AI interview. Room ID: ${roomId} — Go to the Interview page and click "Join Room"`} target="_blank" rel="noreferrer"
+                      className="px-5 py-2.5 rounded-xl text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-all">
+                      WhatsApp 📲
+                    </a>
+                  </div>
+
+                  <div className="bg-gray-800 rounded-xl p-3 text-left text-xs text-gray-400 space-y-1">
+                    <p className="text-gray-300 font-semibold mb-1">📋 How the candidate joins:</p>
+                    <p>1. Open the <strong className="text-white">Interview</strong> page</p>
+                    <p>2. Select <strong className="text-white">HR Live Interview</strong></p>
+                    <p>3. Enter their name, choose <strong className="text-white">Student / Candidate</strong></p>
+                    <p>4. Paste the Room ID → click <strong className="text-white">Join</strong></p>
+                  </div>
+
+                  <div className="flex items-center gap-2 justify-center">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+                    <span className="text-yellow-400 text-sm">Waiting for participants... ({participants.length} joined)</span>
+                  </div>
+
+                  <button id="btn-start-live-interview" onClick={startInterview}
+                    className="w-full py-3.5 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all shadow-lg"
+                    style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                    🚀 Start Interview Session
+                  </button>
+                </>
+              ) : (
+                /* Candidate who joined via Room ID */
+                <>
+                  <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-3xl animate-pulse" style={{ background: '#22c55e20' }}>✅</div>
+                  <h2 className="text-white font-bold text-xl">You've Joined!</h2>
+                  <p className="text-gray-400 text-sm">You are connected to room <span className="text-white font-mono font-bold">{roomId}</span></p>
+                  <div className="flex justify-center gap-1.5 pt-2">
+                    {[0,1,2,3].map(i => (
+                      <div key={i} className="w-2 h-2 rounded-full bg-green-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                    ))}
+                  </div>
+                  <p className="text-gray-500 text-sm">Waiting for the interviewer to start the session...</p>
+                  <div className="flex items-center gap-2 justify-center">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                    <span className="text-green-400 text-sm">{participants.length} participant{participants.length !== 1 ? 's' : ''} in room</span>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Email invite */}
+            {/* Email invite — only for room creator */}
             {isRoomCreator && (
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-3">
-                <h3 className="text-white font-semibold text-sm">📧 Email Invitation</h3>
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 space-y-3 shadow-md">
+                <h3 className="text-gray-900 dark:text-white font-semibold text-sm">📧 Email Invitation</h3>
                 <input type="text" value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="Candidate name (optional)"
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-red-500" />
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-350 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-red-500" />
                 <div className="flex gap-2">
                   <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="candidate@email.com"
-                    className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-red-500" />
+                    className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-355 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-red-500" />
                   <button id="btn-send-invite" onClick={handleSendEmailInvite} disabled={emailSending || !inviteEmail}
                     className="px-4 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50 transition-all"
                     style={{ background: '#ef4444' }}>
@@ -1084,38 +1587,38 @@ export default function LiveInterview() {
     // ── AI Self-Practice Interview (no video, no chat, single user) ──
     if (mainMode === 'ai') {
       return (
-        <div className="min-h-screen bg-gray-950 flex flex-col">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col transition-colors duration-300">
           {/* Top bar */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800" style={{ background: '#111827' }}>
+          <div className="flex items-center justify-between px-5 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-green-400 text-sm font-medium">🤖 AI Interview</span>
+                <span className="text-green-600 dark:text-green-400 text-sm font-medium">🤖 AI Interview</span>
               </div>
               <span className="px-2.5 py-1 rounded-lg text-xs font-semibold" style={{ background: '#6366f120', color: '#818cf8', border: '1px solid #6366f130' }}>
                 Q {questionNumber} / {totalQuestions}
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={resetAll} className="text-gray-500 hover:text-gray-300 text-sm transition-all">✕ Exit</button>
+              <button onClick={resetAll} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-sm transition-all">✕ Exit</button>
             </div>
           </div>
 
           {/* Main layout wrapper */}
           <div className="flex flex-1 overflow-hidden">
             {/* Left Sidebar for Question Progress */}
-            <div className="w-64 border-r border-gray-800 bg-gray-900/30 p-5 overflow-y-auto hidden md:block">
-              <h3 className="text-gray-400 text-xs font-semibold mb-4 uppercase tracking-wider">Interview Progress</h3>
+            <div className="w-64 border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30 p-5 overflow-y-auto hidden md:block">
+              <h3 className="text-gray-500 dark:text-gray-400 text-xs font-semibold mb-4 uppercase tracking-wider">Interview Progress</h3>
               <div className="space-y-2">
                 {Array.from({ length: totalQuestions }).map((_, i) => {
                   const isPast = i < questionNumber - 1;
                   const isCurrent = i === questionNumber - 1;
                   return (
                     <div key={i} className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${isCurrent ? 'bg-indigo-500/10 border border-indigo-500/20 shadow-sm' : 'border border-transparent'}`}>
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${isPast ? 'bg-green-500/20 text-green-400' : isCurrent ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'bg-gray-800 text-gray-500'}`}>
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${isPast ? 'bg-green-500/20 text-green-450' : isCurrent ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-450'}`}>
                         {isPast ? '✓' : i + 1}
                       </div>
-                      <span className={`text-sm ${isPast ? 'text-gray-400' : isCurrent ? 'text-indigo-400 font-medium' : 'text-gray-600'}`}>
+                      <span className={`text-sm ${isPast ? 'text-gray-500 dark:text-gray-400' : isCurrent ? 'text-indigo-650 dark:text-indigo-400 font-medium' : 'text-gray-400 dark:text-gray-600'}`}>
                         Question {i + 1}
                       </span>
                     </div>
@@ -1136,25 +1639,25 @@ export default function LiveInterview() {
                       style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)', border: '1px solid #6366f130' }}>
                       🤖
                     </div>
-                    <div className="flex-1 bg-gray-900 border border-indigo-500/30 rounded-2xl rounded-tl-none p-5 space-y-2">
+                    <div className="flex-1 bg-white dark:bg-gray-900 border border-indigo-500/30 rounded-2xl rounded-tl-none p-5 space-y-2 shadow-sm">
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-medium">
                           Question {questionNumber}
                         </span>
                         {currentQuestion.topic && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 border border-gray-700">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
                             {currentQuestion.topic}
                           </span>
                         )}
                       </div>
-                      <p className="text-white font-medium text-lg leading-relaxed">{currentQuestion.question}</p>
+                      <p className="text-gray-900 dark:text-white font-medium text-lg leading-relaxed">{currentQuestion.question}</p>
                     </div>
                   </div>
 
                   {/* Answer box */}
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 mt-1"
-                      style={{ background: '#1f2937', border: '1px solid #374151' }}>
+                      style={{ background: isDark ? '#1f2937' : '#f3f4f6', border: `1px solid ${isDark ? '#374151' : '#d1d5db'}` }}>
                       👤
                     </div>
                     <div className="flex-1 space-y-3">
@@ -1163,17 +1666,17 @@ export default function LiveInterview() {
                         onChange={e => setAnswer(e.target.value)}
                         placeholder="Type your answer here..."
                         rows={6}
-                        className="w-full bg-gray-900 border border-gray-700 text-gray-200 rounded-2xl rounded-tl-none px-4 py-3 text-sm resize-none focus:outline-none focus:border-indigo-500 transition-colors"
+                        className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-2xl rounded-tl-none px-4 py-3 text-sm resize-none focus:outline-none focus:border-indigo-500 transition-colors"
                       />
                       <div className="flex gap-3">
                         <button id="btn-voice-toggle" onClick={toggleVoice}
                           className="px-4 py-2.5 rounded-xl text-sm font-medium border transition-all"
-                          style={{ borderColor: isListening ? '#ef4444' : '#374151', background: isListening ? '#ef444420' : '#1f2937', color: isListening ? '#f87171' : '#9ca3af' }}>
+                          style={{ borderColor: isListening ? '#ef4444' : (isDark ? '#374151' : '#d1d5db'), background: isListening ? '#ef444420' : (isDark ? '#1f2937' : '#f3f4f6'), color: isListening ? '#f87171' : (isDark ? '#9ca3af' : '#4b5563') }}>
                           {isListening ? '🔴 Stop' : '🎙️ Voice'}
                         </button>
                         <button id="btn-submit-answer" onClick={handleSubmitAnswer} disabled={!answer.trim()}
                           className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40 transition-all"
-                          style={{ background: answer.trim() ? 'linear-gradient(135deg, #6366f1, #ef4444)' : '#374151' }}>
+                          style={{ background: answer.trim() ? 'linear-gradient(135deg, #6366f1, #ef4444)' : (isDark ? '#374151' : '#e5e7eb'), color: answer.trim() ? '#ffffff' : (isDark ? '#9ca3af' : '#9ca3af') }}>
                           Submit Answer →
                         </button>
                       </div>
@@ -1182,7 +1685,7 @@ export default function LiveInterview() {
 
                   {/* Show a subtle "loading next question" indicator after submit */}
                   {feedback && (
-                    <div className="ml-16 flex items-center gap-2 text-gray-600 text-xs">
+                    <div className="ml-16 flex items-center gap-2 text-gray-650 dark:text-gray-500 text-xs">
                       <div className="flex gap-1">
                         {[0,1,2].map(i => (
                           <div key={i} className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
@@ -1196,7 +1699,7 @@ export default function LiveInterview() {
                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl animate-pulse"
                     style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)' }}>🤖</div>
-                  <p className="text-gray-400 text-sm">AI is preparing your next question...</p>
+                  <p className="text-gray-650 dark:text-gray-400 text-sm">AI is preparing your next question...</p>
                 </div>
               )}
             </div>

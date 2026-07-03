@@ -8,12 +8,24 @@ import PlacementPrediction from './pages/PlacementPrediction';
 import CareerRoadmap from './pages/CareerRoadmap';
 import FakeSkillDetection from './pages/FakeSkillDetection';
 import Layout from './components/Layout';
+import Header from './components/Header';
 import AdminDashboard from "./pages/AdminDashboard";
 import LiveInterview from "./pages/LiveInterview";
 
 const ProtectedLayout = ({ children }) => {
   const token = localStorage.getItem('token');
   return token ? <Layout>{children}</Layout> : <Navigate to="/login" />;
+};
+
+const ProtectedNoFooterLayout = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) return <Navigate to="/login" />;
+  return (
+    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
+      <Header />
+      <main className="flex-1">{children}</main>
+    </div>
+  );
 };
 
 export default function App() {
@@ -43,7 +55,7 @@ export default function App() {
         } />
               <Route path="/admin" element={<AdminDashboard />} />
 <Route path="/live-interview" element={
-  <ProtectedLayout><LiveInterview /></ProtectedLayout>
+  <ProtectedNoFooterLayout><LiveInterview /></ProtectedNoFooterLayout>
 } />
       </Routes>
 

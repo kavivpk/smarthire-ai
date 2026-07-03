@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import API from '../services/api';
+import { useTheme } from '../context/useTheme';
 
 export default function ResumeAnalyzer() {
+  const { isDark } = useTheme();
+  const borderDefault = isDark ? '#374151' : '#e5e7eb';
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -70,7 +73,7 @@ export default function ResumeAnalyzer() {
               onClick={() => document.getElementById('fileInput').click()}
               className="border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors"
               style={{
-                borderColor: dragOver ? '#3b82f6' : file ? '#22c55e' : '#374151',
+                borderColor: dragOver ? '#3b82f6' : file ? '#22c55e' : borderDefault,
                 backgroundColor: dragOver ? '#1e3a5f20' : 'transparent'
               }}
             >
@@ -134,7 +137,7 @@ export default function ResumeAnalyzer() {
               <p className="text-gray-500 dark:text-gray-400 text-sm mb-3">ATS Score</p>
               <div className="relative w-32 h-32 mx-auto mb-3">
                 <svg viewBox="0 0 36 36" className="w-32 h-32 -rotate-90">
-                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1f2937" strokeWidth="2.5"/>
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke={isDark ? '#1f2937' : '#e5e7eb'} strokeWidth="2.5"/>
                   <circle cx="18" cy="18" r="15.9" fill="none"
                     stroke={getScoreColor(result.atsScore)}
                     strokeWidth="2.5"

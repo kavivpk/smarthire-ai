@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { AI_SERVICE_URL } from '../config/apiConfig';
+import { useTheme } from '../context/useTheme';
 
 
 export default function FakeSkillDetection() {
+  const { isDark } = useTheme();
+  const borderDefault = isDark ? '#374151' : '#e5e7eb';
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -79,7 +82,7 @@ export default function FakeSkillDetection() {
                 onClick={() => document.getElementById('fsdFileInput').click()}
                 className="border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors"
                 style={{
-                  borderColor: dragOver ? '#ef4444' : file ? '#22c55e' : '#374151',
+                  borderColor: dragOver ? '#ef4444' : file ? '#22c55e' : borderDefault,
                   backgroundColor: dragOver ? '#ef444410' : 'transparent'
                 }}
               >
@@ -145,7 +148,7 @@ export default function FakeSkillDetection() {
                 </p>
                 <div className="relative w-36 h-36 mb-4">
                   <svg viewBox="0 0 36 36" className="w-36 h-36 -rotate-90">
-                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1f2937" strokeWidth="2.5"/>
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke={isDark ? '#1f2937' : '#e5e7eb'} strokeWidth="2.5"/>
                     <circle cx="18" cy="18" r="15.9" fill="none"
                       stroke={getScoreColor(result.credibility_score)}
                       strokeWidth="2.5"

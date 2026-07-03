@@ -210,6 +210,18 @@ export default function Register() {
                 </select>
               </div>
 
+              {formData.role === 'admin' && (
+                <div>
+                  <label className="text-gray-700 dark:text-gray-300 text-sm font-medium mb-1.5 block">
+                    Admin Secret Key
+                  </label>
+                  <input type="password" name="adminSecret" value={formData.adminSecret || ''}
+                    onChange={handleChange} placeholder="Required for Admin registration" required
+                    className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                  />
+                </div>
+              )}
+
               <button type="submit" disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50">
                 {loading ? (

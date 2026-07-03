@@ -1,4 +1,5 @@
 import Editor from '@monaco-editor/react';
+import { useTheme } from '../context/useTheme';
 
 const LANGUAGE_CONFIG = {
   python:     { label: 'Python',     monacoId: 'python',     icon: '🐍' },
@@ -11,24 +12,30 @@ const LANGUAGE_CONFIG = {
 
 export default function CodeEditor({ language, value, onChange, onLanguageChange }) {
   const config = LANGUAGE_CONFIG[language] || LANGUAGE_CONFIG.python;
+  const { isDark } = useTheme();
+
+  const containerBg = isDark ? '#1e1e1e' : '#ffffff';
+  const toolbarBg = isDark ? '#252526' : '#f3f4f6';
+  const borderCls = isDark ? 'border-gray-700' : 'border-gray-300';
+  const textCls = isDark ? 'text-gray-400' : 'text-gray-600';
 
   return (
-    <div className="flex flex-col h-full rounded-xl overflow-hidden border border-gray-700" style={{ background: '#1e1e1e' }}>
+    <div className={`flex flex-col h-full rounded-xl overflow-hidden border ${borderCls}`} style={{ background: containerBg }}>
       {/* Editor Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700" style={{ background: '#252526' }}>
+      <div className={`flex items-center justify-between px-4 py-2 border-b ${borderCls}`} style={{ background: toolbarBg }}>
         {/* Tab bar */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 font-mono">solution.{language === 'cpp' ? 'cpp' : language === 'javascript' ? 'js' : language}</span>
+          <span className={`text-xs font-mono ${textCls}`}>solution.{language === 'cpp' ? 'cpp' : language === 'javascript' ? 'js' : language}</span>
           <span className="w-2 h-2 bg-yellow-400 rounded-full" title="Unsaved changes" />
         </div>
 
         {/* Language selector */}
         <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-400">Language:</label>
+          <label className={`text-xs ${textCls}`}>Language:</label>
           <select
             value={language}
             onChange={e => onLanguageChange && onLanguageChange(e.target.value)}
-            className="text-xs bg-gray-700 text-gray-200 border border-gray-600 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+            className="text-xs bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
             style={{ fontFamily: 'Consolas, monospace' }}
           >
             {Object.entries(LANGUAGE_CONFIG).map(([key, cfg]) => (
@@ -45,7 +52,7 @@ export default function CodeEditor({ language, value, onChange, onLanguageChange
           language={config.monacoId}
           value={value}
           onChange={v => onChange && onChange(v || '')}
-          theme="vs-dark"
+          theme={isDark ? "vs-dark" : "light"}
           options={{
             fontSize: 14,
             fontFamily: "'Fira Code', 'Cascadia Code', Consolas, monospace",
@@ -67,7 +74,7 @@ export default function CodeEditor({ language, value, onChange, onLanguageChange
             </div>
           }
         />
+      </div>
     </div>
-  </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AI_SERVICE_URL } from '../config/apiConfig';
+import { useTheme } from '../context/useTheme';
 
 const SKILLS_LIST = [
   'JavaScript', 'Python', 'Java', 'React', 'Node.js',
@@ -8,6 +9,8 @@ const SKILLS_LIST = [
 ];
 
 export default function PlacementPrediction() {
+  const { isDark } = useTheme();
+  const borderDefault = isDark ? '#374151' : '#d1d5db';
   const [formData, setFormData] = useState({
     cgpa: '',
     skills: [],
@@ -178,8 +181,8 @@ export default function PlacementPrediction() {
                         color: '#22c55e'
                       } : {
                         backgroundColor: 'transparent',
-                        borderColor: '#374151',
-                        color: '#9ca3af'
+                        borderColor: borderDefault,
+                        color: isDark ? '#9ca3af' : '#6b7280'
                       }}
                     >
                       {formData.skills.includes(skill) ? '✓ ' : ''}{skill}

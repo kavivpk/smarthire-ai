@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import API from '../services/api';
 import { AI_SERVICE_URL } from '../config/apiConfig';
+import { useTheme } from '../context/useTheme';
 
 const TOPICS = [
   { id: 'javascript', label: 'JavaScript', color: '#f7df1e', bg: '#f7df1e20' },
@@ -14,6 +15,8 @@ const TOPICS = [
 ];
 
 export default function MockInterview() {
+  const { isDark } = useTheme();
+  const borderDefault = isDark ? '#374151' : '#e5e7eb';
   const [stage, setStage] = useState('select'); // select → resume → interview → result
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -150,7 +153,7 @@ export default function MockInterview() {
               onClick={() => setMode('topic')}
               className="p-4 rounded-xl border-2 transition-all text-left"
               style={{
-                borderColor: mode === 'topic' ? '#a855f7' : '#374151',
+                borderColor: mode === 'topic' ? '#a855f7' : borderDefault,
                 backgroundColor: mode === 'topic' ? '#a855f720' : 'transparent'
               }}
             >
@@ -167,7 +170,7 @@ export default function MockInterview() {
               onClick={() => setMode('resume')}
               className="p-4 rounded-xl border-2 transition-all text-left"
               style={{
-                borderColor: mode === 'resume' ? '#a855f7' : '#374151',
+                borderColor: mode === 'resume' ? '#a855f7' : borderDefault,
                 backgroundColor: mode === 'resume' ? '#a855f720' : 'transparent'
               }}
             >
@@ -219,7 +222,7 @@ export default function MockInterview() {
               <div
                 onClick={() => document.getElementById('interviewResume').click()}
                 className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors"
-                style={{ borderColor: resumeFile ? '#22c55e' : '#374151' }}
+              style={{ borderColor: resumeFile ? '#22c55e' : borderDefault }}
               >
                 <div className="text-3xl mb-2">{resumeFile ? '✅' : '📄'}</div>
                 {resumeFile ? (
@@ -375,7 +378,7 @@ export default function MockInterview() {
             </p>
             <div className="relative w-32 h-32 mx-auto mb-3">
               <svg viewBox="0 0 36 36" className="w-32 h-32 -rotate-90">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1f2937" strokeWidth="2.5"/>
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke={isDark ? '#1f2937' : '#e5e7eb'} strokeWidth="2.5"/>
                 <circle cx="18" cy="18" r="15.9" fill="none"
                   stroke={getScoreColor(result.totalScore)}
                   strokeWidth="2.5"

@@ -17,7 +17,6 @@ export default function Dashboard() {
       ),
       title: 'Resume Analyzer',
       desc: 'ATS Score + Skill Gap',
-      phase: 'Phase 2',
       accent: '#3b82f6',
       path: '/resume',
     },
@@ -30,7 +29,6 @@ export default function Dashboard() {
       ),
       title: 'Mock Interview',
       desc: 'Technical + HR Questions',
-      phase: 'Phase 2',
       accent: '#a855f7',
       path: '/interview',
     },
@@ -44,7 +42,6 @@ export default function Dashboard() {
       ),
       title: 'Placement Prediction',
       desc: 'ML-based probability',
-      phase: 'Phase 3',
       accent: '#22c55e',
       path: '/prediction',
     },
@@ -59,7 +56,6 @@ export default function Dashboard() {
       ),
       title: 'Skill Detection',
       desc: 'Fake skill warning',
-      phase: 'Phase 3',
       accent: '#ef4444',
       path: '/fakeskill',
     },
@@ -71,7 +67,6 @@ export default function Dashboard() {
       ),
       title: 'Analytics',
       desc: 'Student analytics + Charts',
-      phase: 'Phase 4',
       accent: '#14b8a6',
       path: '/admin',
     }] : []),
@@ -84,7 +79,6 @@ export default function Dashboard() {
       ),
       title: 'Career Roadmap',
       desc: 'Personalized learning path',
-      phase: 'Phase 3',
       accent: '#f59e0b',
       path: '/career-roadmap',
     },
@@ -97,7 +91,6 @@ export default function Dashboard() {
   ),
   title: 'Live Interview',
   desc: 'Real-time AI + Admin interview',
-  phase: 'Phase 4',
   accent: '#ef4444',
   path: '/live-interview',
 },
@@ -146,13 +139,7 @@ export default function Dashboard() {
               <p className="text-gray-500 dark:text-gray-400 text-xs mb-3">
                 {f.desc}
               </p>
-              <div className="flex items-center justify-between">
-                <span
-                  className="text-xs px-2 py-1 rounded-md font-medium"
-                  style={{ backgroundColor: `${f.accent}18`, color: f.accent }}
-                >
-                  {f.phase}
-                </span>
+              <div className="flex items-center justify-end">
                 {f.path ? (
                   <span className="text-xs text-gray-400 dark:text-gray-500">Open →</span>
                 ) : (

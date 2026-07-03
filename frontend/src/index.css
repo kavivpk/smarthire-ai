@@ -1,3 +1,42 @@
 @import "tailwindcss";
 
- @custom-variant dark (&:where(.dark, .dark *));  
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Base Theme ─────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light dark;
+}
+
+html, body, #root {
+  min-height: 100%;
+}
+
+/* Light mode base */
+body {
+  background-color: #f3f4f6;
+  color: #111827;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Dark mode base — applied when .dark is on <html> */
+html.dark body {
+  background-color: #030712;
+  color: #f9fafb;
+}
+
+/* Ensure scrollbar matches theme */
+html.dark {
+  color-scheme: dark;
+}
+
+/* Smooth transitions on all elements */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+
+/* Override transition for animations that should stay fast */
+button, a {
+  transition-duration: 150ms;
+}

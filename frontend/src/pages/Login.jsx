@@ -23,7 +23,11 @@ export default function Login() {
       const res = await API.post('/auth/login', formData);
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
-      navigate('/dashboard');
+      if (res.data.user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
     } finally {
@@ -42,7 +46,11 @@ export default function Login() {
       });
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
-      navigate('/dashboard');
+      if (res.data.user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch {
       setError('Google login failed. Try again.');
     }
@@ -56,7 +64,7 @@ export default function Login() {
   ];
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex flex-row-reverse">
 
       {/* Left — Form */}
       <div className="w-full lg:w-1/2 flex flex-col bg-white dark:bg-gray-950 transition-colors duration-300">

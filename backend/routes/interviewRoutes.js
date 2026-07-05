@@ -10,6 +10,12 @@ const {
   evaluateCode,
   getCodingProblems
 } = require('../controllers/interviewController');
+const {
+  evaluateInterviewAnswer,
+  completeTechnicalInterview,
+  getTechnicalInterviewStats,
+  getCodingStats
+} = require('../controllers/interviewEvaluationController');
 const { protect } = require('../middleware/authMiddleware');
 const { sendRoomInvite } = require('../utils/emailService');
 const User = require('../models/User');
@@ -22,6 +28,10 @@ router.post('/aptitude', protect, generateAptitude);
 router.post('/aptitude/submit', protect, submitAptitude);
 router.post('/evaluate-code', protect, evaluateCode);
 router.get('/coding-problems', protect, getCodingProblems);
+router.post('/evaluate', protect, evaluateInterviewAnswer);
+router.post('/evaluate/complete', protect, completeTechnicalInterview);
+router.get('/technical-stats', protect, getTechnicalInterviewStats);
+router.get('/coding-stats', protect, getCodingStats);
 
 // Send room invite email
 router.post('/send-invite', protect, async (req, res) => {

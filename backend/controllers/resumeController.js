@@ -1,4 +1,5 @@
 const Resume = require('../models/Resume');
+const ResumeReport = require('../models/ResumeReport');
 const pdfParse = require('pdf-parse/lib/pdf-parse.js');
 const fs = require('fs');
 const path = require('path');
@@ -87,6 +88,86 @@ const analyzeResume = async (req, res) => {
       suggestions,
       resumeId: resume._id
     });
+
+    // AI-powered deep analysis + ResumeReport persistence (fire-and-forget)
+    // Runs after response is sent — never blocks or breaks the existing flow
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    if (GROQ_API_KEY && req.user && req.user.id) {
+      const prompt = `You are an expert resume analyzer. Analyze the resume below and return ONLY a valid JSON object.
+
+Resume Text:
+${extractedText.slice(0, 3000)}
+
+Matched Skills: ${matchedSkills.join(', ') || 'None'}
+Missing Skills: ${missingSkills.slice(0, 8).join(', ') || 'None'}
+ATS Score: ${atsScore}%
+
+Return ONLY this JSON (no markdown, no explanation):
+{
+  "skills": [],
+  "projects": [],
+  "education": [],
+  "experience": [],
+  "certifications": [],
+  "strengths": [],
+  "weaknesses": [],
+  "resumeScore": 0,
+  "recommendedRole": "",
+  "improvementSuggestions": [],
+  "overallFeedback": ""
+}`;
+
+      fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+          max_tokens: 800
+        })
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(groqData => {
+          let aiResult = null;
+          if (groqData) {
+            try {
+              const raw = groqData.choices[0].message.content
+                .trim()
+                .replace(/```json?/g, '')
+                .replace(/```/g, '')
+                .trim();
+              aiResult = JSON.parse(raw);
+            } catch (_) { /* ignore parse errors */ }
+          }
+
+          return ResumeReport.create({
+            userId: req.user.id,
+            resumeId: resume._id,
+            fileName: req.file ? req.file.originalname : '',
+            skills: aiResult?.skills?.length ? aiResult.skills : matchedSkills,
+            missingSkills: aiResult ? (aiResult.missingSkills || []) : missingSkills.slice(0, 8),
+            projects: aiResult?.projects || [],
+            education: aiResult?.education || [],
+            experience: aiResult?.experience || [],
+            certifications: aiResult?.certifications || [],
+            strengths: aiResult?.strengths || [],
+            weaknesses: aiResult?.weaknesses || [],
+            atsScore,
+            resumeScore: typeof aiResult?.resumeScore === 'number' ? aiResult.resumeScore : atsScore,
+            recommendedRole: aiResult?.recommendedRole || '',
+            improvementSuggestions: aiResult?.improvementSuggestions?.length
+              ? aiResult.improvementSuggestions
+              : suggestions,
+            overallFeedback: aiResult?.overallFeedback || '',
+            createdByAI: true
+          });
+        })
+        .catch(err => console.error('Failed to save ResumeReport:', err));
+    }
 
   } catch (error) {
     console.error('Resume analysis error:', error);

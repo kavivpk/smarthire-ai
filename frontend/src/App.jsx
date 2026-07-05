@@ -11,6 +11,7 @@ import Layout from './components/Layout';
 import Header from './components/Header';
 import AdminDashboard from "./pages/AdminDashboard";
 import LiveInterview from "./pages/LiveInterview";
+import CodingAssessment from "./pages/CodingAssessment";
 
 const ProtectedLayout = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -56,6 +57,9 @@ export default function App() {
               <Route path="/admin" element={<AdminDashboard />} />
 <Route path="/live-interview" element={
   <ProtectedNoFooterLayout><LiveInterview /></ProtectedNoFooterLayout>
+} />
+<Route path="/coding" element={
+  <ProtectedNoFooterLayout><CodingAssessment /></ProtectedNoFooterLayout>
 } />
       </Routes>
 

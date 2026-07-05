@@ -1,7 +1,8 @@
 const Interview = require('../models/Interview');
 const User = require('../models/User');
 const AptitudeQuestion = require('../models/AptitudeQuestion');
-const { sendAptitudeResult } = require('../utils/emailService');
+const CodingReport = require('../models/CodingReport');
+const { sendAptitudeResult, sendCodingReport } = require('../utils/emailService');
 
 // Skill-based question bank
 const skillQuestions = {
@@ -582,6 +583,56 @@ ${runOnly ?
       }; 
     }
     res.json(evaluation);
+
+    // Persist full evaluation to DB (fire-and-forget, never blocks the response)
+    if (!runOnly && req.user && req.user.id) {
+      const passed = Array.isArray(evaluation.testCases)
+        ? evaluation.testCases.filter(tc => tc.status === 'Pass').length
+        : 0;
+      const total = Array.isArray(evaluation.testCases)
+        ? evaluation.testCases.length
+        : 0;
+
+      // Match the submitted problem description back to the problems list so we
+      // can store a stable problemId and title.
+      const matched = codingProblems.find(p => p.description === problem);
+
+      CodingReport.create({
+        userId: req.user.id,
+        problemId: matched ? matched.id : -1,
+        problemTitle: matched ? matched.title : 'Unknown',
+        language,
+        code,
+        score: typeof evaluation.score === 'number' ? evaluation.score : 0,
+        verdict: evaluation.verdict || '',
+        testCasesPassed: passed,
+        testCasesTotal: total,
+        testCaseResults: Array.isArray(evaluation.testCases) ? evaluation.testCases : [],
+        feedback: evaluation.feedback || '',
+        hints: evaluation.hints || '',
+        timeComplexity: evaluation.timeComplexity || ''
+      }).catch(err => console.error('Failed to save coding report:', err));
+
+      // Send email report (fire-and-forget, never blocks response)
+      User.findById(req.user.id)
+        .then(user => {
+          if (user && user.email) {
+            return sendCodingReport(user.email, user.name, {
+              problemTitle: matched ? matched.title : 'Unknown',
+              language,
+              score: typeof evaluation.score === 'number' ? evaluation.score : 0,
+              verdict: evaluation.verdict || '',
+              testCasesPassed: passed,
+              testCasesTotal: total,
+              testCaseResults: Array.isArray(evaluation.testCases) ? evaluation.testCases : [],
+              feedback: evaluation.feedback || '',
+              hints: evaluation.hints || '',
+              timeComplexity: evaluation.timeComplexity || ''
+            });
+          }
+        })
+        .catch(err => console.error('Failed to send coding report email:', err));
+    }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

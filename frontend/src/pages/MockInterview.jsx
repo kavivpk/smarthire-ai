@@ -30,6 +30,10 @@ export default function MockInterview() {
   const [resumeSkills, setResumeSkills] = useState([]);
   const [questionCount, setQuestionCount] = useState(5);
   const [mode, setMode] = useState('topic'); // 'topic' or 'resume'
+  const [interviewId, setInterviewId] = useState('');
+  const [currentEvaluation, setCurrentEvaluation] = useState(null);
+  const [evaluatedAnswers, setEvaluatedAnswers] = useState([]);
+  const [evaluationError, setEvaluationError] = useState('');
 
   // Topic based interview
   const startTopicInterview = async (topic) => {
@@ -41,7 +45,11 @@ export default function MockInterview() {
       setQuestionData(res.data.questions);
       setCurrentQ(0);
       setAnswers([]);
+      setEvaluatedAnswers([]);
       setCurrentAnswer('');
+      setCurrentEvaluation(null);
+      setEvaluationError('');
+      setInterviewId(`topic-${topic.id}-${Date.now()}`);
       setStage('interview');
     } catch {
       alert('Failed to load questions');
@@ -77,7 +85,11 @@ export default function MockInterview() {
       setQuestionData(qRes.data.questions);
       setCurrentQ(0);
       setAnswers([]);
+      setEvaluatedAnswers([]);
       setCurrentAnswer('');
+      setCurrentEvaluation(null);
+      setEvaluationError('');
+      setInterviewId(`resume-${Date.now()}`);
       setStage('interview');
     } catch {
       alert('Failed to analyze resume. Make sure AI service is running.');
@@ -86,33 +98,72 @@ export default function MockInterview() {
     }
   };
 
-  const nextQuestion = () => {
+  const evaluateCurrentAnswer = async () => {
     if (!currentAnswer.trim()) return;
 
-    const newAnswers = [...answers, {
+    setLoading(true);
+    setEvaluationError('');
+    try {
+      const activeQuestion = questions[currentQ];
+      const res = await API.post('/interview/evaluate', {
+        question: activeQuestion.question,
+        answer: currentAnswer,
+        resume: resumeSkills.join(', '),
+        interviewId,
+        keywords: activeQuestion.keywords || questionData[currentQ]?.keywords || []
+      });
+
+      setCurrentEvaluation(res.data);
+    } catch {
+      setEvaluationError('Evaluation failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const continueAfterEvaluation = () => {
+    if (!currentEvaluation) return;
+
+    const answerRecord = {
       questionId: currentQ,
       question: questions[currentQ].question,
-      answer: currentAnswer
-    }];
+      answer: currentAnswer,
+      evaluation: currentEvaluation
+    };
+
+    const newAnswers = [...answers, answerRecord];
+    const newEvaluatedAnswers = [...evaluatedAnswers, answerRecord];
     setAnswers(newAnswers);
+    setEvaluatedAnswers(newEvaluatedAnswers);
     setCurrentAnswer('');
+    setCurrentEvaluation(null);
+    setEvaluationError('');
 
     if (currentQ + 1 < questions.length) {
       setCurrentQ(currentQ + 1);
     } else {
-      submitInterview(newAnswers);
+      submitInterview(newAnswers, newEvaluatedAnswers);
     }
   };
 
-  const submitInterview = async (finalAnswers) => {
+  const submitInterview = async (finalAnswers, finalEvaluatedAnswers) => {
     setLoading(true);
     try {
-      const res = await API.post('/interview/submit', {
-        topic: selectedTopic.id,
-        answers: finalAnswers,
-        questions: questionData
+      const [submitRes, completeRes] = await Promise.all([
+        API.post('/interview/submit', {
+          topic: selectedTopic.id,
+          answers: finalAnswers,
+          questions: questionData
+        }),
+        API.post('/interview/evaluate/complete', { interviewId })
+      ]);
+
+      setResult({
+        ...submitRes.data,
+        technicalSummary: completeRes.data.summary,
+        technicalReports: completeRes.data.reports,
+        evaluatedAnswers: finalEvaluatedAnswers
       });
-      setResult(res.data);
       setStage('result');
     } catch {
       alert('Submission failed');
@@ -348,6 +399,7 @@ export default function MockInterview() {
             <textarea
               value={currentAnswer}
               onChange={(e) => setCurrentAnswer(e.target.value)}
+              disabled={!!currentEvaluation}
               placeholder="Type your answer here..."
               rows={5}
               className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-500 transition-colors resize-none"
@@ -355,14 +407,57 @@ export default function MockInterview() {
             <p className="text-gray-400 text-xs mt-2">{currentAnswer.length} characters</p>
           </div>
 
+          {evaluationError && (
+            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+              {evaluationError}
+            </div>
+          )}
+
+          {currentEvaluation && (
+            <div className="bg-white dark:bg-gray-900 border border-purple-500/30 rounded-2xl p-6 mb-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
+                  AI Evaluation
+                </h3>
+                <span className="text-lg font-bold" style={{ color: getScoreColor(currentEvaluation.overallScore) }}>
+                  {currentEvaluation.overallScore}/10
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+                {[
+                  ['Technical', currentEvaluation.technicalScore],
+                  ['Communication', currentEvaluation.communicationScore],
+                  ['Grammar', currentEvaluation.grammarScore],
+                  ['Confidence', currentEvaluation.confidenceScore],
+                  ['Keyword', currentEvaluation.keywordScore],
+                ].map(([label, score]) => (
+                  <div key={label} className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                    <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">{label}</p>
+                    <p className="font-bold text-sm" style={{ color: getScoreColor(score) }}>{score}/10</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <p className="text-gray-700 dark:text-gray-300">{currentEvaluation.feedback}</p>
+                <p className="text-gray-500 dark:text-gray-400">
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Recommendation:</span> {currentEvaluation.recommendation}
+                </p>
+              </div>
+            </div>
+          )}
+
           <button
-            onClick={nextQuestion}
+            onClick={currentEvaluation ? continueAfterEvaluation : evaluateCurrentAnswer}
             disabled={!currentAnswer.trim() || loading}
             className="w-full py-3 rounded-xl font-medium text-white transition-colors disabled:opacity-40"
             style={{ backgroundColor: '#a855f7' }}
           >
-            {loading ? 'Submitting...' :
-              currentQ + 1 === questions.length ? 'Submit Interview ✓' : 'Next Question →'}
+            {loading ? 'Evaluating...' :
+              currentEvaluation
+                ? (currentQ + 1 === questions.length ? 'Finish Interview' : 'Continue to Next Question')
+                : 'Submit Answer'}
           </button>
         </div>
       )}
@@ -402,6 +497,32 @@ export default function MockInterview() {
             </span>
           </div>
 
+          {result.technicalSummary && (
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
+              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-4">
+                Technical Interview Summary
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                {[
+                  ['Technical', result.technicalSummary.averageTechnical],
+                  ['Communication', result.technicalSummary.averageCommunication],
+                  ['Grammar', result.technicalSummary.averageGrammar],
+                  ['Confidence', result.technicalSummary.averageConfidence],
+                ].map(([label, score]) => (
+                  <div key={label} className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                    <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">{label}</p>
+                    <p className="font-bold text-sm" style={{ color: getScoreColor(score) }}>{score}/10</p>
+                  </div>
+                ))}
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                <p>Strongest: <span className="text-gray-900 dark:text-white">{result.technicalSummary.strongestSkill}</span></p>
+                <p>Weakest: <span className="text-gray-900 dark:text-white">{result.technicalSummary.weakestSkill}</span></p>
+                <p>{result.technicalSummary.recommendations?.[0]}</p>
+              </div>
+            </div>
+          )}
+
           {/* Per question */}
           {result.results.map((r, i) => (
             <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
@@ -426,7 +547,15 @@ export default function MockInterview() {
           ))}
 
           <button
-            onClick={() => { setStage('select'); setResult(null); setResumeFile(null); setResumeSkills([]); }}
+            onClick={() => {
+              setStage('select');
+              setResult(null);
+              setResumeFile(null);
+              setResumeSkills([]);
+              setCurrentEvaluation(null);
+              setEvaluatedAnswers([]);
+              setInterviewId('');
+            }}
             className="w-full py-3 rounded-xl font-medium text-white"
             style={{ backgroundColor: '#a855f7' }}
           >

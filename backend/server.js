@@ -4,6 +4,8 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const Interview = require('./models/Interview');
+const HRInterviewReport = require('./models/HRInterviewReport');
 const http = require('http');
 const { Server } = require('socket.io');
 
@@ -70,10 +72,12 @@ const authRoutes = require('./routes/authRoutes');
 const resumeRoutes = require('./routes/resumeRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 app.use('/api/auth', authRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'SmartHire AI Backend running!' });
@@ -311,11 +315,37 @@ io.on('connection', (socket) => {
         } catch (err) {
           console.error('Failed to save completed live interview:', err);
         }
+
+        // Save HR Interview Report (fire-and-forget, never breaks the interview flow)
+        HRInterviewReport.create({
+          userId: studentUserId,
+          interviewId: roomId,
+          interviewType: 'HR',
+          questions: room.scores.map(s => s.question),
+          answers: room.scores.map(s => s.answer),
+          aiFeedback: room.scores.map(s => s.feedback).filter(Boolean),
+          strengths: [],
+          weaknesses: [],
+          communicationScore: totalScore,
+          confidenceScore: totalScore,
+          professionalismScore: totalScore,
+          overallScore: totalScore,
+          recommendation: totalScore >= 7
+            ? 'Strong candidate. Recommended for next round.'
+            : totalScore >= 4
+              ? 'Average performance. Further assessment recommended.'
+              : 'Needs improvement before proceeding.',
+          duration: 0,
+          createdByAI: true
+        }).catch(err => console.error('Failed to save HRInterviewReport:', err));
       }
 
       room.status = 'completed';
     }
   });
+
+  const adminRoutes = require('./routes/adminRoutes');
+app.use('/api/admin', adminRoutes);
 
   // ── Admin sends question (Admin mode) ──
   socket.on('admin_send_question', ({ roomId, question, topic }) => {
@@ -398,6 +428,29 @@ io.on('connection', (socket) => {
         } catch (err) {
           console.error('Failed to save ended live interview:', err);
         }
+
+        // Save HR Interview Report (fire-and-forget, never breaks the interview flow)
+        HRInterviewReport.create({
+          userId: studentUserId,
+          interviewId: roomId,
+          interviewType: 'HR',
+          questions: room.scores.map(s => s.question),
+          answers: room.scores.map(s => s.answer),
+          aiFeedback: room.scores.map(s => s.feedback).filter(Boolean),
+          strengths: [],
+          weaknesses: [],
+          communicationScore: totalScore,
+          confidenceScore: totalScore,
+          professionalismScore: totalScore,
+          overallScore: totalScore,
+          recommendation: totalScore >= 7
+            ? 'Strong candidate. Recommended for next round.'
+            : totalScore >= 4
+              ? 'Average performance. Further assessment recommended.'
+              : 'Needs improvement before proceeding.',
+          duration: 0,
+          createdByAI: true
+        }).catch(err => console.error('Failed to save HRInterviewReport (end_interview):', err));
       }
     }
 

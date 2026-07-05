@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import resume, prediction, fake_skill, roadmap, aptitude
+from routers import resume, prediction, fake_skill, roadmap, aptitude, interview_agent
 
 app = FastAPI(title="SmartHire AI Service", version="1.0.0")
 
@@ -17,6 +17,7 @@ app.include_router(prediction.router, prefix="/api/prediction", tags=["Predictio
 app.include_router(fake_skill.router, prefix="/api/fakeskill", tags=["Fake Skill"])
 app.include_router(roadmap.router, prefix="/api/roadmap", tags=["Roadmap"])
 app.include_router(aptitude.router, prefix="/api/aptitude", tags=["Aptitude"])
+app.include_router(interview_agent.router, prefix="/api/agents/interview", tags=["Interview Agent"])
 
 @app.get("/")
 def root():

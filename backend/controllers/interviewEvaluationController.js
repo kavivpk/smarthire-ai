@@ -7,6 +7,7 @@ const {
   summarizeTechnicalInterview
 } = require('../services/interviewEvaluationService');
 const { sendTechnicalInterviewReport } = require('../utils/emailService');
+const { notify } = require('../services/notificationService');
 
 const normalizeScore = (value) => {
   const number = Number(value);
@@ -148,6 +149,20 @@ const completeTechnicalInterview = async (req, res) => {
         duration: 0,
         createdByAI: true
       }).catch(err => console.error('Failed to save InterviewReport:', err));
+
+      // Notification — send email + store history
+      notify(req.user.id, {
+        type: 'technical_interview',
+        title: 'Technical Interview Completed',
+        message: `You completed a technical interview session (${reports.length} questions). Overall score: ${summary.overallScore || 0}/10.`,
+        emailFn: async () => {
+          const user = await User.findById(req.user.id).select('email name');
+          if (user && user.email) {
+            const { sendTechnicalInterviewReport: sendEmail } = require('../utils/emailService');
+            await sendEmail(user.email, user.name, { ...summary, reports });
+          }
+        }
+      });
     }
   } catch (error) {
     console.error('Technical interview completion failed:', error);

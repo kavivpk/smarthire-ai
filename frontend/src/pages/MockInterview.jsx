@@ -189,11 +189,13 @@ export default function MockInterview() {
       {stage === 'select' && (
         <div className="space-y-4">
 
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
+            style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontFamily:'Sora, sans-serif', fontSize:22, fontWeight:600, lineHeight:1.3 }}
+              className="text-gray-900 dark:text-white mb-1">
               Mock Interview
             </h2>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">
+            <p style={{ fontFamily:'Inter, sans-serif', fontSize:14.5 }} className="text-gray-500 dark:text-gray-400">
               Choose how you want to practice
             </p>
           </div>
@@ -237,8 +239,10 @@ export default function MockInterview() {
 
           {/* Topic mode */}
           {mode === 'topic' && (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-sm">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
+              style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontFamily:'Sora, sans-serif', fontWeight:600, fontSize:15 }}
+                className="text-gray-900 dark:text-white mb-4">
                 Select Topic
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -264,8 +268,10 @@ export default function MockInterview() {
 
           {/* Resume mode */}
           {mode === 'resume' && (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 space-y-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 space-y-4"
+              style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontFamily:'Sora, sans-serif', fontWeight:600, fontSize:15 }}
+                className="text-gray-900 dark:text-white">
                 Upload Your Resume
               </h3>
 
@@ -379,21 +385,25 @@ export default function MockInterview() {
           )}
 
           {/* Question */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-4">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-4"
+            style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
             <div className="flex items-center gap-2 mb-4">
               <span className="text-xs font-medium px-2 py-1 rounded-md"
-                style={{ backgroundColor: '#a855f720', color: '#a855f7' }}>
+                style={{ backgroundColor: '#a855f720', color: '#a855f7', fontFamily:'JetBrains Mono, monospace' }}>
                 Q{currentQ + 1}
               </span>
             </div>
-            <p className="text-gray-900 dark:text-white font-medium text-base leading-relaxed">
+            <p style={{ fontFamily:'Inter, sans-serif', fontSize:15, lineHeight:1.7, fontWeight:500 }}
+              className="text-gray-900 dark:text-white">
               {questions[currentQ].question}
             </p>
           </div>
 
           {/* Answer */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-4">
-            <label className="text-gray-500 dark:text-gray-400 text-sm mb-2 block">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-4"
+            style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+            <label style={{ fontFamily:'Inter, sans-serif', fontSize:12, fontWeight:600, letterSpacing:'0.05em', textTransform:'uppercase' }}
+              className="text-gray-500 dark:text-gray-400 mb-2 block">
               Your Answer
             </label>
             <textarea
@@ -414,12 +424,14 @@ export default function MockInterview() {
           )}
 
           {currentEvaluation && (
-            <div className="bg-white dark:bg-gray-900 border border-purple-500/30 rounded-2xl p-6 mb-4">
+            <div className="bg-white dark:bg-gray-900 border border-purple-500/30 rounded-2xl p-6 mb-4"
+              style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(168,85,247,0.2)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
+                <h3 style={{ fontFamily:'Sora, sans-serif', fontWeight:600, fontSize:15 }}
+                  className="text-gray-900 dark:text-white">
                   AI Evaluation
                 </h3>
-                <span className="text-lg font-bold" style={{ color: getScoreColor(currentEvaluation.overallScore) }}>
+                <span style={{ fontFamily:'JetBrains Mono, monospace', fontSize:18, fontWeight:700, color: getScoreColor(currentEvaluation.overallScore) }}>
                   {currentEvaluation.overallScore}/10
                 </span>
               </div>
@@ -433,8 +445,8 @@ export default function MockInterview() {
                   ['Keyword', currentEvaluation.keywordScore],
                 ].map(([label, score]) => (
                   <div key={label} className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-                    <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">{label}</p>
-                    <p className="font-bold text-sm" style={{ color: getScoreColor(score) }}>{score}/10</p>
+                    <p style={{ fontFamily:'Inter, sans-serif', fontSize:12 }} className="text-gray-500 dark:text-gray-400 mb-1">{label}</p>
+                    <p style={{ fontFamily:'JetBrains Mono, monospace', fontSize:14, fontWeight:700, color: getScoreColor(score) }}>{score}/10</p>
                   </div>
                 ))}
               </div>
@@ -467,8 +479,10 @@ export default function MockInterview() {
         <div className="space-y-4">
 
           {/* Score */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 text-center">
-            <p className="text-gray-500 dark:text-gray-400 text-sm mb-3">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 text-center"
+            style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+            <p style={{ fontFamily:'Inter, sans-serif', fontSize:13, letterSpacing:'0.04em', textTransform:'uppercase' }}
+              className="text-gray-500 dark:text-gray-400 mb-3">
               {selectedTopic?.label} Interview Score
             </p>
             <div className="relative w-32 h-32 mx-auto mb-3">
@@ -482,10 +496,10 @@ export default function MockInterview() {
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                <span style={{ fontFamily:'JetBrains Mono, monospace', fontSize:32, fontWeight:700, letterSpacing:'-0.02em', color:getScoreColor(result.totalScore) }}>
                   {result.totalScore}
                 </span>
-                <span className="text-xs text-gray-500">/ 10</span>
+                <span style={{ fontFamily:'Inter, sans-serif', fontSize:12 }} className="text-gray-400">/ 10</span>
               </div>
             </div>
             <span className="text-sm font-medium px-3 py-1 rounded-full"

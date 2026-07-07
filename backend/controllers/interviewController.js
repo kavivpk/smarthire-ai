@@ -2,7 +2,9 @@ const Interview = require('../models/Interview');
 const User = require('../models/User');
 const AptitudeQuestion = require('../models/AptitudeQuestion');
 const CodingReport = require('../models/CodingReport');
-const { sendAptitudeResult, sendCodingReport } = require('../utils/emailService');
+const InterviewSession = require('../models/InterviewSession');
+const { sendAptitudeResult, sendCodingReport, sendCombinedAIInterviewResult } = require('../utils/emailService');
+const { notify } = require('../services/notificationService');
 
 // Skill-based question bank
 const skillQuestions = {
@@ -431,24 +433,42 @@ const submitAptitude = async (req, res) => {
     const categoryScores = {};
     const results = qBank.map(q => {
       const selected = (answers && answers[q.id] !== undefined) ? answers[q.id] : -1;
-      const isCorrect = selected === q.answer;
+      // Bug fix: coerce to numbers to avoid strict-equality type mismatch
+      // (q.answer from MongoDB may be stored/returned as string, selected from JSON body may differ)
+      const selectedNum = Number(selected);
+      const correctNum = Number(q.answer);
+      const isCorrect = selectedNum !== -1 && selectedNum === correctNum;
       if (isCorrect) correct++;
       const cat = q.section || q.category || 'General';
       if (!categoryScores[cat]) categoryScores[cat] = { correct: 0, total: 0 };
       categoryScores[cat].total++;
       if (isCorrect) categoryScores[cat].correct++;
-      return { id: q.id, category: cat, question: q.question, selected, correctAnswer: q.answer, correctOption: q.options[q.answer], isCorrect };
+      return { id: q.id, category: cat, question: q.question, selected: selectedNum, correctAnswer: correctNum, correctOption: q.options[correctNum], isCorrect };
     });
     const totalScore = Math.round((correct / qBank.length) * 100);
 
-    // Send email asynchronously without blocking the response
-    if (req.user && req.user.id) {
+    // Send standalone email only when NOT part of the combined AI Interview flow
+    // (the combined flow sends sendCombinedAIInterviewResult via /session/save instead)
+    const { skipEmail } = req.body;
+    if (req.user && req.user.id && !skipEmail) {
       User.findById(req.user.id).then(user => {
         if (user && user.email) {
           sendAptitudeResult(user.email, user.name, { totalScore, correct, total: qBank.length, categoryScores })
             .catch(err => console.error('Failed to send aptitude result email:', err));
         }
       }).catch(err => console.error('Error fetching user for email:', err));
+
+      notify(req.user.id, {
+        type: 'aptitude',
+        title: 'Aptitude Test Completed',
+        message: `You scored ${totalScore}% (${correct}/${qBank.length} correct) in the aptitude assessment.`,
+        emailFn: async () => {
+          const user = await User.findById(req.user.id).select('email name');
+          if (user && user.email) {
+            await sendAptitudeResult(user.email, user.name, { totalScore, correct, total: qBank.length, categoryScores });
+          }
+        }
+      });
     }
 
     res.json({ correct, total: qBank.length, totalScore, categoryScores, results });
@@ -613,7 +633,7 @@ ${runOnly ?
         timeComplexity: evaluation.timeComplexity || ''
       }).catch(err => console.error('Failed to save coding report:', err));
 
-      // Send email report (fire-and-forget, never blocks response)
+      // Send email + notification (fire-and-forget, never blocks response)
       User.findById(req.user.id)
         .then(user => {
           if (user && user.email) {
@@ -632,10 +652,67 @@ ${runOnly ?
           }
         })
         .catch(err => console.error('Failed to send coding report email:', err));
+
+      notify(req.user.id, {
+        type: 'coding',
+        title: 'Coding Assessment Completed',
+        message: `${matched ? matched.title : 'Problem'} evaluated. Score: ${typeof evaluation.score === 'number' ? evaluation.score : 0}/10. Verdict: ${evaluation.verdict || 'N/A'}.`,
+        emailFn: async () => {
+          const user = await User.findById(req.user.id).select('email name');
+          if (user && user.email) {
+            await sendCodingReport(user.email, user.name, {
+              problemTitle: matched ? matched.title : 'Unknown',
+              language,
+              score: typeof evaluation.score === 'number' ? evaluation.score : 0,
+              verdict: evaluation.verdict || '',
+              testCasesPassed: passed,
+              testCasesTotal: total,
+              testCaseResults: Array.isArray(evaluation.testCases) ? evaluation.testCases : [],
+              feedback: evaluation.feedback || '',
+              hints: evaluation.hints || '',
+              timeComplexity: evaluation.timeComplexity || ''
+            });
+          }
+        }
+      });
     }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-module.exports = { getQuestions, getQuestionsFromSkills, submitInterview, getHistory, generateAptitude, submitAptitude, evaluateCode, getCodingProblems };
+const saveInterviewSession = async (req, res) => {
+  try {
+    const { aptitudeResult, codingResult, technicalResult, overallScore, violations, disqualified } = req.body;
+    const session = await InterviewSession.create({
+      userId: req.user.id,
+      aptitudeResult:  aptitudeResult  || {},
+      codingResult:    codingResult    || {},
+      technicalResult: technicalResult || {},
+      overallScore:    overallScore    || { score: 0, outOf: 90, percent: 0 },
+      violations:      violations      || 0,
+      disqualified:    disqualified    || false,
+      completedAt:     new Date(),
+    });
+
+    // Fire-and-forget email — never blocks the response
+    User.findById(req.user.id).select('email name').then(user => {
+      if (user && user.email) {
+        sendCombinedAIInterviewResult(user.email, user.name, {
+          aptitude:     aptitudeResult  || {},
+          coding:       codingResult    || {},
+          technical:    technicalResult || {},
+          overall:      overallScore    || {},
+          violations:   violations      || 0,
+          disqualified: disqualified    || false,
+        }).catch(err => console.error('Combined AI Interview email failed:', err));
+      }
+    }).catch(err => console.error('User lookup for email failed:', err));
+
+    res.json({ message: 'Session saved', sessionId: session._id });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+module.exports = { getQuestions, getQuestionsFromSkills, submitInterview, getHistory, generateAptitude, submitAptitude, evaluateCode, getCodingProblems, saveInterviewSession };

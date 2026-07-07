@@ -4,15 +4,13 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ResumeAnalyzer from './pages/ResumeAnalyzer';
 import MockInterview from './pages/MockInterview';
-import PlacementPrediction from './pages/PlacementPrediction';
-import CareerRoadmap from './pages/CareerRoadmap';
 import FakeSkillDetection from './pages/FakeSkillDetection';
 import Layout from './components/Layout';
 import Header from './components/Header';
 import AdminDashboard from "./pages/AdminDashboard";
 import LiveInterview from "./pages/LiveInterview";
 import CodingAssessment from "./pages/CodingAssessment";
-
+import BulkScreening from './pages/BulkScreening';
 const ProtectedLayout = ({ children }) => {
   const token = localStorage.getItem('token');
   return token ? <Layout>{children}</Layout> : <Navigate to="/login" />;
@@ -45,12 +43,6 @@ export default function App() {
         <Route path="/interview" element={
           <ProtectedLayout><MockInterview /></ProtectedLayout>
         } />
-        <Route path="/prediction" element={
-          <ProtectedLayout><PlacementPrediction /></ProtectedLayout>
-        } />
-        <Route path="/career-roadmap" element={
-          <ProtectedLayout><CareerRoadmap /></ProtectedLayout>
-        } />
         <Route path="/fakeskill" element={
           <ProtectedLayout><FakeSkillDetection /></ProtectedLayout>
         } />
@@ -61,6 +53,9 @@ export default function App() {
 <Route path="/coding" element={
   <ProtectedNoFooterLayout><CodingAssessment /></ProtectedNoFooterLayout>
 } />
+        <Route path="/bulk-screening" element={
+          <ProtectedLayout><BulkScreening /></ProtectedLayout>
+        } />
       </Routes>
 
     </BrowserRouter>

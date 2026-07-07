@@ -260,7 +260,125 @@ const sendTechnicalInterviewReport = async (toEmail, studentName, reportData) =>
   return transporter.sendMail(mailOptions);
 };
 
-module.exports = { sendRoomInvite, sendAptitudeResult, sendTechnicalInterviewReport, sendCodingReport, sendLoginSummary };
+/**
+ * sendCombinedAIInterviewResult — sent immediately after AI Interview completion (Phase 3.5)
+ * Includes Aptitude + Coding + Technical section scores, overall score, violation/disqualification info.
+ */
+const sendCombinedAIInterviewResult = async (toEmail, studentName, data) => {
+  const transporter = createTransporter();
+  const {
+    aptitude = {},   // { correct, total, totalScore, categoryScores }
+    coding = {},     // { solved, total, avgScore }
+    technical = {},  // { overallScore, totalScore }
+    overall = {},    // { score, outOf, percent }
+    violations = 0,
+    disqualified = false,
+  } = data;
+
+  const statusBanner = disqualified
+    ? `<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#dc2626;font-weight:600;">
+        🚫 This session was terminated due to repeated proctoring violations (${violations}/3 warnings reached).
+       </div>`
+    : '';
+
+  const catRows = aptitude.categoryScores
+    ? Object.entries(aptitude.categoryScores).map(([cat, s]) =>
+        `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#374151;">${cat}</td>
+         <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#2563eb;">${s.correct}/${s.total}</td></tr>`
+      ).join('')
+    : '';
+
+  const mailOptions = {
+    from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
+    to: toEmail,
+    subject: disqualified
+      ? '⛔ AI Interview Result — Session Disqualified'
+      : '📊 Your AI Interview Results — Full Report',
+    html: `<!DOCTYPE html>
+    <html><head>
+    <style>
+      body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0;}
+      .wrap{max-width:560px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);}
+      .hdr{background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:28px 32px;color:#fff;}
+      .logo{font-size:22px;font-weight:bold;margin-bottom:4px;}
+      .logo span{color:#60a5fa;}
+      .sub{color:#93c5fd;font-size:13px;}
+      .body{padding:28px 32px;}
+      .sec{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:16px;}
+      .sec-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;margin-bottom:10px;}
+      .score-row{display:flex;justify-content:space-between;align-items:center;}
+      .score-big{font-size:28px;font-weight:800;color:#1d4ed8;}
+      .overall{background:linear-gradient(135deg,#1e3a5f,#2563eb);border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;}
+      .ov-label{color:#93c5fd;font-size:12px;letter-spacing:.5px;text-transform:uppercase;}
+      .ov-val{font-size:38px;font-weight:800;color:#fff;margin-top:4px;}
+      table{width:100%;border-collapse:collapse;font-size:13px;}
+      .ftr{background:#f9fafb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;}
+    </style></head>
+    <body>
+    <div class="wrap">
+      <div class="hdr">
+        <div class="logo">SmartHire <span>AI</span></div>
+        <div class="sub">AI Interview — Complete Result Report</div>
+      </div>
+      <div class="body">
+        <p style="color:#374151;font-size:16px;font-weight:600;margin-bottom:4px;">Hello, ${studentName || 'Candidate'}! 👋</p>
+        <p style="color:#6b7280;font-size:14px;margin-bottom:20px;">
+          Your AI Interview session has ended. Here is your complete score breakdown.
+        </p>
+        ${statusBanner}
+        <div class="overall">
+          <div class="ov-label">Overall Score</div>
+          <div class="ov-val">${overall.score || 0} / ${overall.outOf || 90} <span style="font-size:18px;">(${overall.percent || 0}%)</span></div>
+        </div>
+
+        <!-- Aptitude -->
+        <div class="sec">
+          <div class="sec-title">🧠 Aptitude Section</div>
+          <div class="score-row">
+            <span style="color:#374151;font-size:14px;">Score</span>
+            <span class="score-big">${aptitude.correct || 0} / ${aptitude.total || 0}</span>
+          </div>
+          ${catRows ? `<table style="margin-top:10px;">${catRows}</table>` : ''}
+        </div>
+
+        <!-- Coding -->
+        <div class="sec">
+          <div class="sec-title">💻 Coding Section</div>
+          <div class="score-row">
+            <span style="color:#374151;font-size:14px;">Avg Score</span>
+            <span class="score-big">${coding.avgScore || 0} / 10</span>
+          </div>
+          <p style="color:#6b7280;font-size:12px;margin-top:6px;">Problems solved: ${coding.solved || 0} / ${coding.total || 0}</p>
+        </div>
+
+        <!-- Technical Q&A -->
+        <div class="sec">
+          <div class="sec-title">🗣️ Technical Q&A Section</div>
+          <div class="score-row">
+            <span style="color:#374151;font-size:14px;">Overall Score</span>
+            <span class="score-big">${technical.overallScore || 0} / 10</span>
+          </div>
+        </div>
+
+        ${violations > 0 ? `<p style="color:#dc2626;font-size:13px;text-align:center;margin-top:10px;">⚠ ${violations} proctoring violation(s) recorded during this session.</p>` : ''}
+      </div>
+      <div class="ftr">© ${new Date().getFullYear()} SmartHire AI · AI-Powered Hiring Intelligence</div>
+    </div>
+    </body></html>`,
+  };
+  return transporter.sendMail(mailOptions);
+};
+
+module.exports = {
+  sendRoomInvite,
+  sendAptitudeResult,
+  sendTechnicalInterviewReport,
+  sendCodingReport,
+  sendLoginSummary,
+  sendHRInterviewReport,
+  sendPlacementRecommendationReport,
+  sendCombinedAIInterviewResult,
+};
 
 async function sendCodingReport(toEmail, studentName, reportData) {
   const transporter = createTransporter();
@@ -361,6 +479,231 @@ async function sendCodingReport(toEmail, studentName, reportData) {
           </div>
 
           <div style="background:#f9fafb;padding:16px;text-align:center;font-size:12px;color:#9ca3af;">
+            © 2024 SmartHire AI · AI-Powered Placement Intelligence
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  return transporter.sendMail(mailOptions);
+}
+
+async function sendLoginSummary(toEmail, studentName, summaryData) {
+  const transporter = createTransporter();
+
+  const scoreRow = (label, score, max = 10) => {
+    if (score === null || score === undefined) return '';
+    const pct = Math.round((score / max) * 100);
+    const color = pct >= 70 ? '#16a34a' : pct >= 40 ? '#d97706' : '#dc2626';
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e5e7eb;">
+        <span style="font-size:13px;color:#374151;">${label}</span>
+        <span style="font-size:14px;font-weight:bold;color:${color};">${score}/${max}</span>
+      </div>`;
+  };
+
+  const mailOptions = {
+    from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
+    to: toEmail,
+    subject: `👋 Welcome back, ${studentName || 'Student'}! — Your SmartHire AI Progress`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:24px;">
+        <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+          <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:28px;text-align:center;">
+            <div style="color:white;font-size:22px;font-weight:bold;">SmartHire <span style="color:#60a5fa;">AI</span></div>
+            <div style="color:#93c5fd;font-size:13px;margin-top:4px;">Login Summary</div>
+          </div>
+          <div style="padding:28px;">
+            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Welcome back, ${studentName || 'Student'}! 👋</p>
+            <p style="color:#6b7280;font-size:13px;margin:0 0 24px;">
+              Here's a quick look at your placement preparation progress so far.
+            </p>
+
+            <div style="background:#f9fafb;border-radius:12px;padding:16px;margin-bottom:20px;">
+              <p style="font-size:12px;font-weight:bold;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 10px;">Assessment Scores</p>
+              ${scoreRow('Technical Interview', summaryData.technicalScore)}
+              ${scoreRow('HR Interview', summaryData.hrScore)}
+              ${scoreRow('Coding Assessment', summaryData.codingScore)}
+              ${scoreRow('Resume ATS Score', summaryData.resumeScore, 100)}
+              ${scoreRow('Aptitude', summaryData.aptitudeScore)}
+            </div>
+
+            ${summaryData.overallReadiness ? `
+            <div style="background:#f0f9ff;border:2px solid #3b82f6;border-radius:12px;padding:16px;text-align:center;margin-bottom:20px;">
+              <p style="font-size:12px;color:#6b7280;text-transform:uppercase;margin:0 0 6px;">Overall Placement Readiness</p>
+              <p style="font-size:28px;font-weight:bold;color:#1d4ed8;margin:0;">${summaryData.overallReadiness}/10</p>
+            </div>` : ''}
+
+            ${summaryData.recommendedRole ? `
+            <div style="background:#f0fdf4;border-left:4px solid #22c55e;border-radius:6px;padding:12px;margin-bottom:20px;">
+              <p style="font-size:12px;font-weight:bold;color:#14532d;margin:0 0 4px;">Recommended Role</p>
+              <p style="font-size:14px;color:#166534;margin:0;">${summaryData.recommendedRole}</p>
+            </div>` : ''}
+
+            <p style="font-size:13px;color:#6b7280;text-align:center;margin:0;">
+              Keep practising to improve your placement readiness!<br>
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" style="color:#2563eb;font-weight:bold;">Open SmartHire AI →</a>
+            </p>
+          </div>
+          <div style="background:#f9fafb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">
+            © 2024 SmartHire AI · AI-Powered Placement Intelligence
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  return transporter.sendMail(mailOptions);
+}
+
+async function sendHRInterviewReport(toEmail, studentName, reportData) {
+  const transporter = createTransporter();
+
+  const scoreColor = (s) => s >= 7 ? '#16a34a' : s >= 4 ? '#d97706' : '#dc2626';
+  const scoreRow = (label, score) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e5e7eb;">
+      <span style="font-size:13px;color:#374151;">${label}</span>
+      <span style="font-size:14px;font-weight:bold;color:${scoreColor(score)};">${score}/10</span>
+    </div>`;
+
+  const mailOptions = {
+    from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
+    to: toEmail,
+    subject: `🤝 HR Interview Report — SmartHire AI`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:24px;">
+        <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+          <div style="background:linear-gradient(135deg,#1e3a5f,#7c3aed);padding:28px;text-align:center;">
+            <div style="color:white;font-size:22px;font-weight:bold;">SmartHire <span style="color:#c4b5fd;">AI</span></div>
+            <div style="color:#ddd6fe;font-size:13px;margin-top:4px;">HR Interview Report</div>
+          </div>
+          <div style="padding:28px;">
+            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Hello, ${studentName || 'Candidate'}! 👋</p>
+            <p style="color:#6b7280;font-size:13px;margin:0 0 24px;">Your HR interview has been evaluated. Here are your results.</p>
+
+            <div style="background:#f5f3ff;border:2px solid #7c3aed;border-radius:12px;padding:16px;text-align:center;margin-bottom:20px;">
+              <p style="font-size:12px;color:#6b7280;text-transform:uppercase;margin:0 0 6px;">Overall Score</p>
+              <p style="font-size:32px;font-weight:bold;color:#7c3aed;margin:0;">${reportData.overallScore || 0}/10</p>
+            </div>
+
+            <div style="background:#f9fafb;border-radius:12px;padding:16px;margin-bottom:20px;">
+              ${scoreRow('Communication', reportData.communicationScore || 0)}
+              ${scoreRow('Confidence', reportData.confidenceScore || 0)}
+              ${scoreRow('Professionalism', reportData.professionalismScore || 0)}
+            </div>
+
+            ${reportData.recommendation ? `
+            <div style="background:#f0fdf4;border-left:4px solid #22c55e;border-radius:6px;padding:14px;margin-bottom:20px;">
+              <p style="font-size:12px;font-weight:bold;color:#14532d;margin:0 0 4px;">Recommendation</p>
+              <p style="font-size:13px;color:#166534;margin:0;">${reportData.recommendation}</p>
+            </div>` : ''}
+          </div>
+          <div style="background:#f9fafb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">
+            © 2024 SmartHire AI · AI-Powered Placement Intelligence
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  return transporter.sendMail(mailOptions);
+}
+
+async function sendPlacementRecommendationReport(toEmail, studentName, reportData) {
+  const transporter = createTransporter();
+
+  const chanceColor = (c) => c >= 70 ? '#16a34a' : c >= 40 ? '#d97706' : '#dc2626';
+  const listItems = (arr) => (arr || []).map(i => `<li style="margin-bottom:4px;font-size:13px;color:#374151;">${i}</li>`).join('');
+
+  const mailOptions = {
+    from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
+    to: toEmail,
+    subject: `🎯 Your Placement Recommendation Report — SmartHire AI`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:24px;">
+        <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+          <div style="background:linear-gradient(135deg,#1e3a5f,#0369a1);padding:28px;text-align:center;">
+            <div style="color:white;font-size:22px;font-weight:bold;">SmartHire <span style="color:#7dd3fc;">AI</span></div>
+            <div style="color:#bae6fd;font-size:13px;margin-top:4px;">Placement Recommendation Report</div>
+          </div>
+          <div style="padding:28px;">
+            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Hello, ${studentName || 'Candidate'}! 🎯</p>
+            <p style="color:#6b7280;font-size:13px;margin:0 0 24px;">Based on all your assessments, here is your personalized placement recommendation.</p>
+
+            <!-- Placement Chance -->
+            <div style="display:flex;gap:16px;margin-bottom:20px;">
+              <div style="flex:1;background:#f0f9ff;border:2px solid #0369a1;border-radius:12px;padding:18px;text-align:center;">
+                <p style="font-size:12px;color:#6b7280;text-transform:uppercase;margin:0 0 6px;">Placement Chance</p>
+                <p style="font-size:32px;font-weight:bold;color:${chanceColor(reportData.estimatedPlacementChance || 0)};margin:0;">${reportData.estimatedPlacementChance || 0}%</p>
+              </div>
+              <div style="flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:18px;text-align:center;">
+                <p style="font-size:12px;color:#6b7280;text-transform:uppercase;margin:0 0 6px;">Readiness</p>
+                <p style="font-size:18px;font-weight:bold;color:#1f2937;margin:0;">${reportData.overallReadiness || 'N/A'}</p>
+              </div>
+            </div>
+
+            <!-- Recommended Role -->
+            ${reportData.recommendedRole ? `
+            <div style="background:#f0fdf4;border-left:4px solid #22c55e;border-radius:6px;padding:14px;margin-bottom:20px;">
+              <p style="font-size:12px;font-weight:bold;color:#14532d;margin:0 0 4px;">Recommended Role</p>
+              <p style="font-size:15px;font-weight:bold;color:#166534;margin:0;">${reportData.recommendedRole}</p>
+            </div>` : ''}
+
+            <!-- Scores -->
+            <div style="background:#f9fafb;border-radius:12px;padding:16px;margin-bottom:20px;">
+              <p style="font-size:12px;font-weight:bold;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 10px;">Assessment Scores</p>
+              ${[
+                ['Aptitude', reportData.aptitudeScore],
+                ['Coding', reportData.codingScore],
+                ['Technical Interview', reportData.technicalScore],
+                ['HR Interview', reportData.hrScore],
+                ['Resume ATS', reportData.resumeScore]
+              ].filter(([, s]) => s > 0).map(([label, score]) => `
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;font-size:13px;">
+                  <span style="color:#374151;">${label}</span>
+                  <span style="font-weight:bold;color:#1d4ed8;">${score}</span>
+                </div>`).join('')}
+            </div>
+
+            <!-- Strengths -->
+            ${(reportData.strengths || []).length ? `
+            <div style="margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:bold;color:#374151;margin:0 0 8px;">✅ Strengths</p>
+              <ul style="margin:0;padding-left:20px;">${listItems(reportData.strengths)}</ul>
+            </div>` : ''}
+
+            <!-- Skills to Improve -->
+            ${(reportData.skillsToImprove || []).length ? `
+            <div style="margin-bottom:16px;">
+              <p style="font-size:13px;font-weight:bold;color:#374151;margin:0 0 8px;">📈 Skills to Improve</p>
+              <ul style="margin:0;padding-left:20px;">${listItems(reportData.skillsToImprove)}</ul>
+            </div>` : ''}
+
+            <!-- Learning Roadmap -->
+            ${(reportData.learningRoadmap || []).length ? `
+            <div style="margin-bottom:20px;">
+              <p style="font-size:13px;font-weight:bold;color:#374151;margin:0 0 8px;">🗺️ Learning Roadmap</p>
+              <ul style="margin:0;padding-left:20px;">${listItems(reportData.learningRoadmap)}</ul>
+            </div>` : ''}
+
+            <!-- AI Summary -->
+            ${reportData.aiSummary ? `
+            <div style="background:#fffbeb;border-left:4px solid #f59e0b;border-radius:6px;padding:14px;">
+              <p style="font-size:12px;font-weight:bold;color:#92400e;margin:0 0 4px;">AI Summary</p>
+              <p style="font-size:13px;color:#78350f;line-height:1.6;margin:0;">${reportData.aiSummary}</p>
+            </div>` : ''}
+          </div>
+          <div style="background:#f9fafb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">
             © 2024 SmartHire AI · AI-Powered Placement Intelligence
           </div>
         </div>

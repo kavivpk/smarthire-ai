@@ -3,6 +3,8 @@ const ResumeReport = require('../models/ResumeReport');
 const pdfParse = require('pdf-parse/lib/pdf-parse.js');
 const fs = require('fs');
 const path = require('path');
+const { notify } = require('../services/notificationService');
+const { scoreResumeText } = require('../utils/atsScoring');
 
 const IMPORTANT_SKILLS = [
   'javascript', 'python', 'java', 'react', 'node', 'express',
@@ -35,32 +37,34 @@ const analyzeResume = async (req, res) => {
     console.log('Extracted text length:', extractedText.length);
 
     // ATS Scoring
-    const matchedSkills = [];
-    const missingSkills = [];
+    // const matchedSkills = [];
+    // const missingSkills = [];
 
-    IMPORTANT_SKILLS.forEach(skill => {
-      if (extractedText.includes(skill)) {
-        matchedSkills.push(skill);
-      } else {
-        missingSkills.push(skill);
-      }
-    });
+    // IMPORTANT_SKILLS.forEach(skill => {
+    //   if (extractedText.includes(skill)) {
+    //     matchedSkills.push(skill);
+    //   } else {
+    //     missingSkills.push(skill);
+    //   }
+    // });
 
-    const atsScore = Math.round(
-      (matchedSkills.length / IMPORTANT_SKILLS.length) * 100
-    );
+    // const atsScore = Math.round(
+    //   (matchedSkills.length / IMPORTANT_SKILLS.length) * 100
+    // );
 
-    // Suggestions
-    const suggestions = [];
-    if (atsScore < 40) suggestions.push('Add more technical skills to your resume');
-    if (!extractedText.includes('project')) suggestions.push('Add projects section with descriptions');
-    if (!extractedText.includes('experience')) suggestions.push('Add work experience or internship details');
-    if (!extractedText.includes('education')) suggestions.push('Add education details clearly');
-    if (missingSkills.length > 5) {
-      suggestions.push(`Learn these in-demand skills: ${missingSkills.slice(0, 3).join(', ')}`);
-    }
-    if (atsScore >= 70) suggestions.push('Great resume! Apply to top product companies');
-    if (suggestions.length === 0) suggestions.push('Your resume looks good!');
+    // // Suggestions
+    // const suggestions = [];
+    // if (atsScore < 40) suggestions.push('Add more technical skills to your resume');
+    // if (!extractedText.includes('project')) suggestions.push('Add projects section with descriptions');
+    // if (!extractedText.includes('experience')) suggestions.push('Add work experience or internship details');
+    // if (!extractedText.includes('education')) suggestions.push('Add education details clearly');
+    // if (missingSkills.length > 5) {
+    //   suggestions.push(`Learn these in-demand skills: ${missingSkills.slice(0, 3).join(', ')}`);
+    // }
+    // if (atsScore >= 70) suggestions.push('Great resume! Apply to top product companies');
+    // if (suggestions.length === 0) suggestions.push('Your resume looks good!');
+
+    const { atsScore, matchedSkills, missingSkills, suggestions } = scoreResumeText(extractedText, IMPORTANT_SKILLS);
 
     // Save to DB
     const resume = await Resume.create({
@@ -164,6 +168,14 @@ Return ONLY this JSON (no markdown, no explanation):
               : suggestions,
             overallFeedback: aiResult?.overallFeedback || '',
             createdByAI: true
+          });
+        })
+        .then(() => {
+          // Notification — store history + no duplicate email (email already sent above if configured)
+          notify(req.user.id, {
+            type: 'resume',
+            title: 'Resume Analyzed Successfully',
+            message: `Your resume scored ${atsScore}% on the ATS check. ${matchedSkills.length} skills matched.`
           });
         })
         .catch(err => console.error('Failed to save ResumeReport:', err));

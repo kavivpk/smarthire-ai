@@ -104,6 +104,7 @@ npm run dev
 **AI Service:**
 ```powershell
 cd ai-service
+venv\Scripts\activate
 uvicorn main:app --reload --port 8000
 ```
 

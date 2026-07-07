@@ -1,6 +1,11 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const CodingReport = require('../models/CodingReport');
+const InterviewReport = require('../models/InterviewReport');
+const HRInterviewReport = require('../models/HRInterviewReport');
+const ResumeReport = require('../models/ResumeReport');
+const { sendLoginSummary } = require('../utils/emailService');
 
 // Register
 const register = async (req, res) => {
@@ -93,6 +98,48 @@ const login = async (req, res) => {
         role: user.role
       }
     });
+
+    // Send login summary email (fire-and-forget, never blocks login)
+    if (user.role === 'student') {
+      const uid = user._id;
+      Promise.all([
+        CodingReport.find({ userId: uid }).select('score').lean(),
+        InterviewReport.find({ userId: uid }).select('overallScore').lean(),
+        HRInterviewReport.find({ userId: uid }).select('overallScore').lean(),
+        ResumeReport.find({ userId: uid }).select('atsScore recommendedRole').lean()
+      ])
+        .then(([coding, technical, hr, resumes]) => {
+          const avg = (arr, field) => {
+            const vals = arr.map(d => d[field]).filter(v => typeof v === 'number');
+            return vals.length ? Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10 : null;
+          };
+
+          const codingScore = avg(coding, 'score');
+          const technicalScore = avg(technical, 'overallScore');
+          const hrScore = avg(hr, 'overallScore');
+          const resumeScore = avg(resumes, 'atsScore');
+          const latestResume = resumes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+          // Compute overall readiness (0-10 scale, skip missing modules)
+          const scores = [codingScore, technicalScore, hrScore,
+            resumeScore !== null ? Math.round(resumeScore / 10 * 10) / 10 : null
+          ].filter(s => s !== null);
+          const overallReadiness = scores.length
+            ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10
+            : null;
+
+          return sendLoginSummary(user.email, user.name, {
+            codingScore,
+            technicalScore,
+            hrScore,
+            resumeScore,
+            aptitudeScore: null,
+            overallReadiness,
+            recommendedRole: latestResume?.recommendedRole || ''
+          });
+        })
+        .catch(err => console.error('Failed to send login summary email:', err));
+    }
 
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

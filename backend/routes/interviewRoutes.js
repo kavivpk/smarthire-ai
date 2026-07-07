@@ -8,7 +8,8 @@ const {
   generateAptitude,
   submitAptitude,
   evaluateCode,
-  getCodingProblems
+  getCodingProblems,
+  saveInterviewSession,
 } = require('../controllers/interviewController');
 const {
   evaluateInterviewAnswer,
@@ -32,6 +33,7 @@ router.post('/evaluate', protect, evaluateInterviewAnswer);
 router.post('/evaluate/complete', protect, completeTechnicalInterview);
 router.get('/technical-stats', protect, getTechnicalInterviewStats);
 router.get('/coding-stats', protect, getCodingStats);
+router.post('/session/save', protect, saveInterviewSession);
 
 // Send room invite email
 router.post('/send-invite', protect, async (req, res) => {

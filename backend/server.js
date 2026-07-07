@@ -6,6 +6,9 @@ const path = require('path');
 const fs = require('fs');
 const Interview = require('./models/Interview');
 const HRInterviewReport = require('./models/HRInterviewReport');
+require('./models/Notification'); // ensure Notification model is registered on startup
+const { sendHRInterviewReport } = require('./utils/emailService');
+const { notify } = require('./services/notificationService');
 const http = require('http');
 const { Server } = require('socket.io');
 
@@ -73,11 +76,21 @@ const resumeRoutes = require('./routes/resumeRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const placementRecommendationRoutes = require('./routes/placementRecommendationRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const recruiterRoutes = require('./routes/recruiterRoutes');
+const bulkScreeningRoutes = require('./routes/bulkScreeningRoutes');
+
 app.use('/api/auth', authRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/placement-recommendation', placementRecommendationRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/recruiter', recruiterRoutes);
+app.use('/api/bulk-screening', bulkScreeningRoutes);
+
 
 app.get('/', (req, res) => {
   res.json({ message: 'SmartHire AI Backend running!' });
@@ -338,14 +351,35 @@ io.on('connection', (socket) => {
           duration: 0,
           createdByAI: true
         }).catch(err => console.error('Failed to save HRInterviewReport:', err));
+
+        // Notification — email + store history
+        notify(studentUserId, {
+          type: 'hr_interview',
+          title: 'HR Interview Completed',
+          message: `Your live HR interview is complete. Overall score: ${totalScore}/10.`,
+          emailFn: async () => {
+            const User = require('./models/User');
+            const user = await User.findById(studentUserId).select('email name');
+            if (user && user.email) {
+              await sendHRInterviewReport(user.email, user.name, {
+                overallScore: totalScore,
+                communicationScore: totalScore,
+                confidenceScore: totalScore,
+                professionalismScore: totalScore,
+                recommendation: totalScore >= 7
+                  ? 'Strong candidate. Recommended for next round.'
+                  : totalScore >= 4
+                    ? 'Average performance. Further assessment recommended.'
+                    : 'Needs improvement before proceeding.'
+              });
+            }
+          }
+        });
       }
 
       room.status = 'completed';
     }
   });
-
-  const adminRoutes = require('./routes/adminRoutes');
-app.use('/api/admin', adminRoutes);
 
   // ── Admin sends question (Admin mode) ──
   socket.on('admin_send_question', ({ roomId, question, topic }) => {
@@ -451,11 +485,43 @@ app.use('/api/admin', adminRoutes);
           duration: 0,
           createdByAI: true
         }).catch(err => console.error('Failed to save HRInterviewReport (end_interview):', err));
+
+        // Notification — email + store history
+        notify(studentUserId, {
+          type: 'hr_interview',
+          title: 'HR Interview Ended',
+          message: `Your live HR interview has ended. Overall score: ${totalScore}/10.`,
+          emailFn: async () => {
+            const User = require('./models/User');
+            const user = await User.findById(studentUserId).select('email name');
+            if (user && user.email) {
+              await sendHRInterviewReport(user.email, user.name, {
+                overallScore: totalScore,
+                communicationScore: totalScore,
+                confidenceScore: totalScore,
+                professionalismScore: totalScore,
+                recommendation: totalScore >= 7
+                  ? 'Strong candidate. Recommended for next round.'
+                  : totalScore >= 4
+                    ? 'Average performance. Further assessment recommended.'
+                    : 'Needs improvement before proceeding.'
+              });
+            }
+          }
+        });
       }
     }
 
     room.status = 'completed';
   });
+  // ── Candidate Disqualification Relay ──
+  // Broadcast to all other participants in the room so the interviewer sees it
+  socket.on('candidate_disqualified', (data) => {
+    if (data && data.roomId) {
+      socket.to(data.roomId).emit('candidate_disqualified', data);
+    }
+  });
+
 // ── WebRTC Signaling ──
   socket.on('webrtc_offer', ({ roomId, offer, to }) => {
     socket.to(to).emit('webrtc_offer', {

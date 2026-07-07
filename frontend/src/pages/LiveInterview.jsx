@@ -5,6 +5,7 @@ import VideoCall from '../components/VideoCall';
 import CodeEditor from '../components/CodeEditor';
 import { BACKEND_URL, AI_SERVICE_URL } from '../config/apiConfig';
 import { useTheme } from '../context/useTheme';
+import ProctoringGuard from '../components/ProctoringGuard';
 
 const SOCKET_URL = BACKEND_URL;
 
@@ -32,7 +33,7 @@ const ScoreRing = ({ score, max = 100, size = 120 }) => {
           style={{ transition: 'stroke-dashoffset 1s ease' }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold" style={{ color }}>{score}</span>
+        <span className="text-2xl font-bold" style={{ color, fontFamily: 'JetBrains Mono, monospace' }}>{score}</span>
         <span className="text-xs text-gray-400">/{max}</span>
       </div>
     </div>
@@ -47,6 +48,15 @@ export default function LiveInterview() {
   const [stage, setStage] = useState('setup'); // setup | aptitude | coding | qa_interview | waiting | interview | result
   const [mainMode, setMainMode] = useState('ai'); // ai | admin
   const [aiSubMode, setAiSubMode] = useState('aptitude'); // aptitude | coding | qa
+  // ── AI Session (combined sequential flow) ─────────────────────────────────
+  const [aiSessionStage, setAiSessionStage] = useState('aptitude'); // aptitude | coding | qa | complete
+  const [sessionViolations, setSessionViolations] = useState(0);
+  const [sessionDisqualified, setSessionDisqualified] = useState(false);
+  const [sessionStarted, setSessionStarted] = useState(false);
+  const [aiCodingResult, setAiCodingResult] = useState(null); // { solved, total, avgScore, results }
+  const [techResult, setTechResult] = useState(null); // { overallScore, totalScore }
+  const [combinedScore, setCombinedScore] = useState(null); // { score, outOf, percent }
+  const [candidateDisqualified, setCandidateDisqualified] = useState(null); // for interviewer side
   const [userName, setUserName] = useState('');
   const [error, setError] = useState('');
 
@@ -76,6 +86,8 @@ export default function LiveInterview() {
   const [adminTopic, setAdminTopic] = useState('General');
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+  const testStartTimeRef = useRef(null);   // set once when aptitude loads — never reset
+  const TOTAL_TEST_DURATION_MS = 75 * 60 * 1000; // 75 minutes total
 
   // manual evaluation (admin side)
   const [evalScores, setEvalScores] = useState({ communication: 0, technical: 0, problemSolving: 0, cultureFit: 0 });
@@ -170,11 +182,17 @@ export default function LiveInterview() {
       setAptAnswers({});
       setCurrentSectionIdx(0);
       setCurrentAptQuestionIdx(0);
-      setAptTotalTimeLeft(flat.length * 60); // 1 min per question total
+      // Single source of truth: record start time once, never reset between sections
+      if (!testStartTimeRef.current) {
+        testStartTimeRef.current = Date.now();
+      }
+      const elapsed = Date.now() - testStartTimeRef.current;
+      setAptTotalTimeLeft(Math.max(0, Math.round((TOTAL_TEST_DURATION_MS - elapsed) / 1000)));
       const firstSecLen = sections[0]?.questions?.length || 0;
-      setAptSectionTimeLeft(firstSecLen * 60); // section timer
+      setAptSectionTimeLeft(firstSecLen * 60); // per-section pacing guide (informational)
       setAptResult(null);
-      setStage('aptitude');
+      // Don't change stage if already in ai_interview — we're embedded inside ProctoringGuard
+      if (stage !== 'ai_interview') setStage('aptitude');
     } catch (e) {
       setError(e.message || 'Failed to load questions. Make sure AI service and backend are running.');
     } finally {
@@ -187,10 +205,17 @@ export default function LiveInterview() {
     try {
       const res = await API.post('/interview/aptitude/submit', {
         answers: aptAnswers,
-        questions: aptitudeQuestions
+        questions: aptitudeQuestions,
+        // Suppress standalone email in combined AI Interview flow — combined report fires later
+        skipEmail: stage === 'ai_interview',
       });
       setAptResult(res.data);
-      setStage('result');
+      // In AI sequential flow, advance to coding; otherwise show result
+      if (stage === 'ai_interview') {
+        onAptitudeComplete(res.data);
+      } else {
+        setStage('result');
+      }
     } catch {
       setError('Failed to submit. Try again.');
     } finally {
@@ -239,21 +264,25 @@ export default function LiveInterview() {
     }
   };
 
-  // Aptitude Global Timer
+  // Aptitude Global Timer — single source of truth via testStartTimeRef
   useEffect(() => {
-    if (stage !== 'aptitude' || aptResult || aptitudeQuestions.length === 0) return;
+    if ((stage !== 'aptitude' && stage !== 'ai_interview') || aptResult || aptitudeQuestions.length === 0) return;
     const interval = setInterval(() => {
-      setAptTotalTimeLeft(prev => {
-        if (prev <= 1) { submitAptitude(); return 0; }
-        return prev - 1;
-      });
+      if (!testStartTimeRef.current) return;
+      const elapsed = Date.now() - testStartTimeRef.current;
+      const remaining = Math.max(0, Math.round((TOTAL_TEST_DURATION_MS - elapsed) / 1000));
+      setAptTotalTimeLeft(remaining);
+      if (remaining <= 0) {
+        clearInterval(interval);
+        submitAptitude();
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, [stage, aptResult, aptitudeQuestions]);
 
   // Aptitude Per-Section Timer
   useEffect(() => {
-    if (stage !== 'aptitude' || aptResult || aptSectionTimeLeft <= 0) return;
+    if ((stage !== 'aptitude' && stage !== 'ai_interview') || aptResult || aptSectionTimeLeft <= 0) return;
     const interval = setInterval(() => {
       setAptSectionTimeLeft(prev => {
         if (prev <= 1) {
@@ -281,7 +310,8 @@ export default function LiveInterview() {
       setCodingResults([]);
       setCodingEval(null);
       setCodingCode(problems[0]?.starterCode?.[codingLanguage] || '// Write your solution here\n');
-      setStage('coding');
+      // Don't change stage if already in ai_interview — embedded flow
+      if (stage !== 'ai_interview') setStage('coding');
     } catch {
       setError('Failed to load coding problems. Make sure backend is running.');
     } finally {
@@ -347,8 +377,12 @@ export default function LiveInterview() {
     const nextIdx = codingProblemIndex + 1;
     if (nextIdx >= codingProblems.length) {
       // All problems done
-      setStage('result');
-      setResult({ type: 'coding', results: codingResults });
+      if (stage === 'ai_interview') {
+        onCodingComplete(codingResults);
+      } else {
+        setStage('result');
+        setResult({ type: 'coding', results: codingResults });
+      }
     } else {
       setCodingProblemIndex(nextIdx);
       setCodingEval(null);
@@ -378,8 +412,12 @@ export default function LiveInterview() {
     
     const nextIdx = codingProblemIndex + 1;
     if (nextIdx >= codingProblems.length) {
-      setStage('result');
-      setResult({ type: 'coding', results: finalResults });
+      if (stage === 'ai_interview') {
+        onCodingComplete(finalResults);
+      } else {
+        setStage('result');
+        setResult({ type: 'coding', results: finalResults });
+      }
     } else {
       setCodingProblemIndex(nextIdx);
       setCodingEval(null);
@@ -389,12 +427,12 @@ export default function LiveInterview() {
 
   // Coding Timers
   useEffect(() => {
-    if (stage !== 'coding' || codingProblems.length === 0) return;
+    if ((stage !== 'coding' && stage !== 'ai_interview') || codingProblems.length === 0) return;
     setCodingTimeLeft(1200); // 20 minutes
   }, [stage, codingProblemIndex, codingProblems]);
 
   useEffect(() => {
-    if (stage !== 'coding' || codingProblems.length === 0) return;
+    if ((stage !== 'coding' && stage !== 'ai_interview') || codingProblems.length === 0) return;
 
     const interval = setInterval(() => {
       setCodingTimeLeft(prev => {
@@ -410,12 +448,41 @@ export default function LiveInterview() {
   }, [stage, codingProblemIndex, codingProblems, codingCode, codingLanguage]);
 
   // ══════════════════════════════════════════════════════════════════════════
+  // AI SEQUENTIAL FLOW — stage-change triggers (replace illegal render-time calls)
+  // ══════════════════════════════════════════════════════════════════════════
+  // When ProctoringGuard fires onSessionStart (sessionStarted → true), kick off aptitude
+  useEffect(() => {
+    if (stage === 'ai_interview' && sessionStarted && aiSessionStage === 'aptitude' && aptitudeQuestions.length === 0 && !aptLoading) {
+      startAptitude();
+    }
+  }, [sessionStarted, stage, aiSessionStage]);
+
+  // When aiSessionStage becomes 'coding', load coding problems
+  useEffect(() => {
+    if (stage === 'ai_interview' && aiSessionStage === 'coding' && codingProblems.length === 0 && !codingLoading) {
+      startCoding();
+    }
+  }, [aiSessionStage, stage]);
+
+  // When aiSessionStage becomes 'qa' AND resume is provided, kick off tech interview via socket
+  useEffect(() => {
+    if (stage === 'ai_interview' && aiSessionStage === 'qa' && resumeFile && !resumeAnalyzing && !socket) {
+      startAiTechInterview();
+    }
+  }, [aiSessionStage, stage, resumeFile]);
+
+  // ══════════════════════════════════════════════════════════════════════════
   // SOCKET / ADMIN INTERVIEW FLOW
   // ══════════════════════════════════════════════════════════════════════════
   const connectSocket = useCallback(() => {
     const newSocket = io(SOCKET_URL);
 
-    newSocket.on('room_created', ({ roomId: id, mode }) => { setRoomId(id); setStage('waiting'); if (mode !== 'ai') setShowModal(true); });
+    newSocket.on('room_created', ({ roomId: id, mode }) => {
+      setRoomId(id);
+      // Don't overwrite stage when in ai_interview (tech Q&A sub-flow uses socket internally)
+      if (stage !== 'ai_interview') setStage('waiting');
+      if (mode !== 'ai') setShowModal(true);
+    });
     newSocket.on('user_joined', ({ participants: p, message }) => {
       setParticipants(p);
       setMessages(prev => [...prev, { id: Date.now(), userName: 'System', role: 'system', message, time: new Date().toLocaleTimeString() }]);
@@ -431,18 +498,31 @@ export default function LiveInterview() {
     newSocket.on('answer_feedback', ({ score, feedback: fb }) => setFeedback({ score, feedback: fb }));
     newSocket.on('new_message', (msg) => setMessages(prev => [...prev, msg]));
     newSocket.on('interview_complete', ({ totalScore, results: r, message }) => {
-      setResult({ totalScore, results: r, message, type: 'qa' });
-      setStage('result');
+      if (mainMode === 'ai') {
+        // AI sequential flow: save tech result and advance to combined results
+        const tech = { overallScore: totalScore, totalScore };
+        setTechResult(tech);
+        setAiSessionStage('complete');
+        saveAndEmailSession({ techResult: tech });
+      } else {
+        setResult({ totalScore, results: r, message, type: 'qa' });
+        setStage('result');
+      }
     });
     newSocket.on('error', ({ message }) => setError(message));
     newSocket.on('room_joined', ({ roomId: id, mode: roomMode, participants: p }) => {
       setRoomId(id);
       setParticipants(p);
-      // Always go to waiting — new_question will move everyone to 'interview'
-      setStage('waiting');
+      // Don't overwrite stage when in ai_interview
+      if (stage !== 'ai_interview') setStage('waiting');
     });
     newSocket.on('interview_started', () => {
-      setStage('interview');
+      // Don't overwrite stage when in ai_interview (tech Q&A runs embedded)
+      if (stage !== 'ai_interview') setStage('interview');
+    });
+    // Candidate disqualified relay (interviewer receives this)
+    newSocket.on('candidate_disqualified', ({ violations, reason }) => {
+      setCandidateDisqualified({ violations, reason });
     });
     // AI monitoring update (admin sees this)
     newSocket.on('ai_monitor_update', (data) => {
@@ -560,6 +640,64 @@ export default function LiveInterview() {
     setTimeout(() => setCopyText('📋 Copy Room ID'), 2000);
   };
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // COMBINED AI INTERVIEW — helpers
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // Pure helper — extract outside component for testability (Property 7)
+  function computeCombinedScore(apt, cod, tech) {
+    const aptPts  = apt  ? Math.round((apt.correct  / (apt.total  || 1)) * 30) : 0;
+    const codPts  = cod  ? Math.round(((cod.avgScore || 0) / 10) * 40) : 0;
+    const techPts = tech ? Math.round(((tech.overallScore || 0) / 100) * 20) : 0;
+    const score   = aptPts + codPts + techPts;
+    return { score, outOf: 90, percent: Math.round((score / 90) * 100), aptPts, codPts, techPts };
+  }
+
+  const saveAndEmailSession = useCallback(async (overrides = {}) => {
+    try {
+      const apt  = overrides.aptResult  ?? aptResult;
+      const cod  = overrides.codingResult ?? aiCodingResult;
+      const tech = overrides.techResult  ?? techResult;
+      const combined = computeCombinedScore(apt, cod, tech);
+      await API.post('/interview/session/save', {
+        aptitudeResult:  apt  || {},
+        codingResult:    cod  || {},
+        technicalResult: tech || {},
+        overallScore:    combined,
+        violations:      overrides.violations  ?? sessionViolations,
+        disqualified:    overrides.disqualified ?? sessionDisqualified,
+      });
+    } catch (err) {
+      console.error('Session save failed (non-blocking):', err);
+    }
+  }, [aptResult, aiCodingResult, techResult, sessionViolations, sessionDisqualified]);
+
+  const onAptitudeComplete = useCallback((result) => {
+    setAptResult(result);
+    setAiSessionStage('coding');
+  }, []);
+
+  const onCodingComplete = useCallback((results) => {
+    const solved   = results.filter(r => (r.score || 0) >= 5).length;
+    const avgScore = results.length
+      ? Math.round(results.reduce((s, r) => s + (r.score || 0), 0) / results.length * 10) / 10
+      : 0;
+    setAiCodingResult({ solved, total: results.length, avgScore, results });
+    setAiSessionStage('qa');
+  }, []);
+
+  const handleAIDisqualified = useCallback(({ violations, reason }) => {
+    setSessionViolations(violations);
+    setSessionDisqualified(true);
+    saveAndEmailSession({ disqualified: true, violations });
+  }, [saveAndEmailSession]);
+
+  const handleManualDisqualified = useCallback(({ violations, reason }) => {
+    setSessionViolations(violations);
+    setSessionDisqualified(true);
+    if (socket) socket.emit('candidate_disqualified', { roomId, violations, reason });
+  }, [socket, roomId]);
+
   const resetAll = () => {
     setStage('setup'); setResult(null); setMessages([]);
     setCurrentQuestion(null); setEmailSent(false); setFeedback(null);
@@ -567,6 +705,11 @@ export default function LiveInterview() {
     setResumeFile(null); setResumeSkills([]);
     setAptitudeQuestions([]); setAptAnswers({}); setAptResult(null);
     setCodingResults([]); setCodingEval(null); setAiMonitorLog([]);
+    testStartTimeRef.current = null;
+    setAiSessionStage('aptitude'); setSessionViolations(0);
+    setSessionDisqualified(false); setSessionStarted(false);
+    setAiCodingResult(null); setTechResult(null); setCombinedScore(null);
+    setCandidateDisqualified(null);
     setEvalScores({ communication: 0, technical: 0, problemSolving: 0, cultureFit: 0 });
     if (socket) { socket.disconnect(); setSocket(null); }
   };
@@ -583,8 +726,14 @@ export default function LiveInterview() {
             <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
             <span className="text-red-400 text-sm font-medium">Interview Studio</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">Live Interview Studio</h1>
-          <p className="text-gray-600 dark:text-gray-400">AI-powered aptitude, coding rounds & live HR interviews</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2"
+            style={{ fontFamily: 'Sora, sans-serif', letterSpacing: '-0.01em' }}>
+            Live Interview Studio
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400"
+            style={{ fontFamily: 'Inter, sans-serif', fontSize: 14.5 }}>
+            AI-powered aptitude, coding rounds & live HR interviews
+          </p>
         </div>
 
         {/* Mode picker */}
@@ -605,69 +754,53 @@ export default function LiveInterview() {
           ))}
         </div>
 
-        {/* ── AI Interview sub-mode ── */}
+        {/* ── AI Interview ── */}
         {mainMode === 'ai' && (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 space-y-5">
-            <h2 className="text-gray-900 dark:text-white font-semibold text-lg">Choose Interview Type</h2>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { id: 'aptitude', icon: '🧠', title: 'Aptitude', desc: '20 MCQ questions', color: '#6366f1' },
-                { id: 'coding', icon: '💻', title: 'Coding', desc: 'Multi-language editor', color: '#06b6d4' },
-                { id: 'qa', icon: '🗣️', title: 'Tech Q&A', desc: 'Resume-based questions', color: '#22c55e' },
-              ].map(s => (
-                <button key={s.id} id={`submode-${s.id}`} onClick={() => setAiSubMode(s.id)}
-                  className="p-4 rounded-xl border text-center transition-all"
-                  style={{ borderColor: aiSubMode === s.id ? s.color : (isDark ? '#374151' : '#e5e7eb'), background: aiSubMode === s.id ? s.color + '15' : (isDark ? '#111827' : '#f9fafb') }}>
-                  <div className="text-2xl mb-2">{s.icon}</div>
-                  <div className="font-semibold text-gray-900 dark:text-white text-sm">{s.title}</div>
-                  <div className="text-gray-500 text-xs mt-1">{s.desc}</div>
-                </button>
-              ))}
-            </div>
+            <h2 className="text-gray-900 dark:text-white font-bold text-xl"
+              style={{ fontFamily: 'Sora, sans-serif', letterSpacing: '-0.01em' }}>
+              AI Interview
+            </h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              Complete Aptitude → Coding → Technical Q&A in one proctored session.
+            </p>
 
             {/* Name */}
             <div>
               <label className="text-gray-400 text-sm mb-1.5 block">Your Name</label>
               <input id="ai-name" type="text" value={userName} onChange={e => setUserName(e.target.value)}
                 placeholder="Enter your name"
-                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500" />
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500" />
             </div>
 
-
-
-            {/* Q&A section */}
-            {aiSubMode === 'qa' && (
-              <div className="p-4 bg-gray-800/50 rounded-xl space-y-4">
-                <p className="text-gray-300 text-sm font-medium">📄 Upload Resume (AI generates questions from your resume)</p>
-                <div onClick={() => document.getElementById('liveResumeUpload').click()}
-                  className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors"
-                  style={{ borderColor: resumeFile ? '#22c55e' : '#4b5563' }}>
-                  <div className="text-2xl mb-1">{resumeFile ? '✅' : '📄'}</div>
-                  {resumeFile ? <p className="text-green-400 text-xs font-medium">{resumeFile.name}</p>
-                    : <p className="text-gray-500 text-xs">Click to upload PDF</p>}
-                  <input id="liveResumeUpload" type="file" accept=".pdf" className="hidden"
-                    onChange={e => { setResumeFile(e.target.files[0]); setResumeSkills([]); }} />
-                </div>
+            {/* Resume upload for Tech Q&A section */}
+            <div>
+              <label className="text-gray-400 text-sm mb-1.5 block">Your Resume (for Tech Q&A section)</label>
+              <div onClick={() => document.getElementById('liveResumeUpload').click()}
+                className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors"
+                style={{ borderColor: resumeFile ? '#22c55e' : (isDark ? '#4b5563' : '#e5e7eb') }}>
+                <div className="text-2xl mb-1">{resumeFile ? '✅' : '📄'}</div>
+                {resumeFile ? <p className="text-green-400 text-xs font-medium">{resumeFile.name}</p>
+                  : <p className="text-gray-500 text-xs">Click to upload PDF</p>}
+                <input id="liveResumeUpload" type="file" accept=".pdf" className="hidden"
+                  onChange={e => { setResumeFile(e.target.files[0]); setResumeSkills([]); }} />
               </div>
-            )}
+            </div>
 
             {error && <p className="text-red-400 text-sm text-center bg-red-500/10 rounded-lg py-2">{error}</p>}
 
-            {/* Start button */}
+            {/* Single start button — enters proctored sequential flow */}
             <button id="btn-start-ai"
               onClick={() => {
                 if (!userName.trim()) { setError('Please enter your name'); return; }
                 setError('');
-                if (aiSubMode === 'aptitude') startAptitude();
-                else if (aiSubMode === 'coding') startCoding();
-                else startAiTechInterview();
+                setAiSessionStage('aptitude');
+                setSessionStarted(false);
+                setStage('ai_interview');
               }}
-              disabled={aptLoading || codingLoading || resumeAnalyzing}
-              className="w-full py-3.5 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              className="w-full py-3.5 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all"
               style={{ background: 'linear-gradient(135deg, #6366f1, #ef4444)' }}>
-              {(aptLoading || codingLoading || resumeAnalyzing) ? (
-                <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" /><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z" /></svg> Preparing...</>
-              ) : `🚀 ${aiSubMode === 'aptitude' ? 'Start Aptitude Test' : aiSubMode === 'coding' ? 'Start Coding Round' : 'Start Technical Interview'}`}
+              🚀 Start AI Interview
             </button>
           </div>
         )}
@@ -723,9 +856,135 @@ export default function LiveInterview() {
   );
 
   // ══════════════════════════════════════════════════════════════════════════
+  // RENDER: AI INTERVIEW (combined sequential flow with ProctoringGuard)
+  // ══════════════════════════════════════════════════════════════════════════
+  if (stage === 'ai_interview') {
+    // Progress indicator helper
+    const steps = [
+      { id: 'aptitude', label: 'Aptitude', icon: '🧠' },
+      { id: 'coding',   label: 'Coding',   icon: '💻' },
+      { id: 'qa',       label: 'Tech Q&A', icon: '🗣️' },
+    ];
+    const stageOrder = { aptitude: 0, coding: 1, qa: 2, complete: 3 };
+    const currentStepIdx = stageOrder[aiSessionStage] ?? 0;
+
+    const AIProgress = () => (
+      <div className="flex items-center gap-2 px-4 py-3 bg-gray-900/80 border-b border-gray-800">
+        {steps.map((s, i) => (
+          <span key={s.id} className="flex items-center gap-1.5">
+            <span style={{
+              padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+              background: i < currentStepIdx ? '#10b981' : i === currentStepIdx ? '#6366f1' : 'rgba(255,255,255,0.06)',
+              color: i <= currentStepIdx ? '#fff' : '#6b7280',
+              border: i === currentStepIdx ? '1px solid #6366f1' : '1px solid transparent',
+            }}>{s.icon} {s.label}</span>
+            {i < steps.length - 1 && <span style={{ color: '#374151', fontSize: 12 }}>→</span>}
+          </span>
+        ))}
+        {sessionViolations > 0 && !sessionDisqualified && (
+          <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700,
+            color: '#f87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
+            ⚠ {sessionViolations}/3
+          </span>
+        )}
+      </div>
+    );
+
+    // Combined results screen
+    if (aiSessionStage === 'complete' || (sessionDisqualified && aiSessionStage !== 'aptitude' && aiSessionStage !== 'coding' && aiSessionStage !== 'qa')) {
+      const combined = computeCombinedScore(aptResult, aiCodingResult, techResult);
+      return (
+        <div className="min-h-screen bg-gray-950 p-4 md:p-8 flex items-center justify-center">
+          <div className="max-w-2xl w-full bg-gray-900 border border-gray-800 rounded-3xl p-8 shadow-2xl">
+            {sessionDisqualified && (
+              <div className="mb-6 rounded-xl p-4 text-center" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <p className="text-red-400 font-bold text-base">🚫 Session Disqualified</p>
+                <p className="text-red-300 text-sm mt-1">Your session was terminated after {sessionViolations}/3 proctoring violations. Partial scores recorded.</p>
+              </div>
+            )}
+            <div className="text-center space-y-4 mb-8">
+              <div className="text-4xl">{combined.percent >= 70 ? '🏆' : combined.percent >= 40 ? '💪' : '📚'}</div>
+              <h2 className="text-white text-2xl font-bold" style={{ fontFamily: 'Sora, sans-serif' }}>AI Interview Complete!</h2>
+              <div className="flex justify-center"><ScoreRing score={combined.percent} size={140} /></div>
+              <p className="text-gray-400 text-sm">{combined.score} / {combined.outOf} points ({combined.percent}%)</p>
+            </div>
+            <div className="space-y-3 mb-8">
+              {[
+                { label: '🧠 Aptitude', pts: combined.aptPts, max: 30, detail: aptResult ? `${aptResult.correct}/${aptResult.total} correct` : '—' },
+                { label: '💻 Coding', pts: combined.codPts, max: 40, detail: aiCodingResult ? `avg ${aiCodingResult.avgScore}/10` : '—' },
+                { label: '🗣️ Technical Q&A', pts: combined.techPts, max: 20, detail: techResult ? `${techResult.overallScore}/100` : '—' },
+              ].map(row => (
+                <div key={row.label} className="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3">
+                  <span className="text-gray-300 text-sm font-medium">{row.label}</span>
+                  <div className="text-right">
+                    <span className="text-white font-bold font-mono text-sm">{row.pts}/{row.max} pts</span>
+                    <span className="text-gray-500 text-xs ml-2">({row.detail})</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-green-400 text-sm mb-6">📧 Full report emailed to your registered address.</p>
+            <button onClick={resetAll} className="w-full py-3 rounded-xl font-semibold text-white transition-all"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #ef4444)' }}>
+              🔄 Return to Setup
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <ProctoringGuard
+        testTitle="AI Interview"
+        onSessionStart={() => setSessionStarted(true)}
+        onDisqualified={handleAIDisqualified}
+      >
+        {sessionStarted && (
+          <div className="min-h-screen bg-gray-950">
+            <AIProgress />
+            {/* APTITUDE — render loading state; actual UI is rendered by stage='aptitude' block below */}
+            {aiSessionStage === 'aptitude' && (
+              aptitudeQuestions.length === 0
+                ? <div className="flex items-center justify-center min-h-screen"><div className="text-white text-sm animate-pulse">🧠 Loading aptitude questions...</div></div>
+                : null
+            )}
+            {/* CODING — render loading state; actual coding UI rendered by stage='coding' block below */}
+            {aiSessionStage === 'coding' && (
+              codingProblems.length === 0
+                ? <div className="flex items-center justify-center min-h-screen"><div className="text-white text-sm animate-pulse">💻 Loading coding problems...</div></div>
+                : null
+            )}
+            {/* TECH Q&A — resume upload prompt if no file, then loading while socket initialises */}
+            {aiSessionStage === 'qa' && !resumeFile && (
+              <div className="flex items-center justify-center min-h-screen p-8">
+                <div className="max-w-md w-full bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+                  <h3 className="text-white font-bold text-lg">📄 Upload Resume for Tech Q&amp;A</h3>
+                  <p className="text-gray-400 text-sm">Upload your resume to generate personalized technical questions.</p>
+                  <div onClick={() => document.getElementById('aiQaResumeUpload').click()}
+                    className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer"
+                    style={{ borderColor: '#4b5563' }}>
+                    <p className="text-gray-500 text-sm">Click to upload PDF</p>
+                    <input id="aiQaResumeUpload" type="file" accept=".pdf" className="hidden"
+                      onChange={e => setResumeFile(e.target.files[0])} />
+                  </div>
+                </div>
+              </div>
+            )}
+            {aiSessionStage === 'qa' && resumeFile && resumeAnalyzing && (
+              <div className="flex items-center justify-center min-h-screen">
+                <div className="text-white text-sm animate-pulse">🔍 Analysing resume, preparing questions...</div>
+              </div>
+            )}
+          </div>
+        )}
+      </ProctoringGuard>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   // RENDER: APTITUDE TEST
   // ══════════════════════════════════════════════════════════════════════════
-  if (stage === 'aptitude') {
+  if (stage === 'aptitude' || (stage === 'ai_interview' && aiSessionStage === 'aptitude' && aptitudeQuestions.length > 0)) {
     const currentSection = aptSections[currentSectionIdx];
     if (!currentSection) return null;
 
@@ -748,8 +1007,8 @@ export default function LiveInterview() {
     // Timer color styling (red if less than 5 minutes remain)
     const timerColor = aptTotalTimeLeft <= 300 ? '#ef4444' : aptTotalTimeLeft <= 900 ? '#f59e0b' : '#10b981';
 
-    const totalDuration = aptitudeQuestions.length * 60;
-    const timePercentage = Math.round((aptTotalTimeLeft / totalDuration) * 100);
+    const totalDuration = TOTAL_TEST_DURATION_MS / 1000; // 75 min total
+    const timePercentage = Math.min(100, Math.round((aptTotalTimeLeft / totalDuration) * 100));
 
     const formatTime = (seconds) => {
       const hrs = Math.floor(seconds / 3600);
@@ -926,9 +1185,10 @@ export default function LiveInterview() {
             {/* Question Card */}
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl relative overflow-hidden">
               <div className="flex items-center justify-between">
-                <span className="text-xs px-2.5 py-1 rounded-md font-bold uppercase tracking-wide bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  Question {globalIndex + 1}
-                </span>
+                <span className="text-xs px-2.5 py-1 rounded-md font-bold uppercase tracking-wide bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+              style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+              Question {globalIndex + 1}
+            </span>
                 {aptAnswers[currentQuestion.id] !== undefined && (
                   <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
                     <span>✓ Answer Saved</span>
@@ -1079,7 +1339,7 @@ export default function LiveInterview() {
   // ══════════════════════════════════════════════════════════════════════════
   // RENDER: CODING ROUND
   // ══════════════════════════════════════════════════════════════════════════
-  if (stage === 'coding') {
+  if (stage === 'coding' || (stage === 'ai_interview' && aiSessionStage === 'coding' && codingProblems.length > 0)) {
     const prob = codingProblems[codingProblemIndex];
     if (!prob) return null;
 
@@ -1090,8 +1350,9 @@ export default function LiveInterview() {
           <div className="flex items-center gap-4">
             <h2 className="text-gray-900 dark:text-white font-bold">💻 Coding Round</h2>
             <span className="text-gray-500 dark:text-gray-400 text-sm">Problem {codingProblemIndex + 1} of {codingProblems.length}</span>
-            <span className="px-2.5 py-1 rounded-md text-xs font-bold font-mono animate-pulse"
+            <span className="text-xs px-2.5 py-1 rounded-lg font-bold font-mono animate-pulse"
               style={{
+                fontFamily: 'JetBrains Mono, monospace',
                 backgroundColor: codingTimeLeft <= 180 ? '#ef444420' : 'rgba(245, 158, 11, 0.1)',
                 color: codingTimeLeft <= 180 ? '#ef4444' : '#fbbf24',
                 border: codingTimeLeft <= 180 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)'
@@ -1161,7 +1422,7 @@ export default function LiveInterview() {
                       Next Problem →
                     </button>
                   ) : (
-                    <button id="btn-finish-coding" onClick={() => { setStage('result'); setResult({ type: 'coding', results: codingResults }); }}
+                    <button id="btn-finish-coding" onClick={() => { if (stage === 'ai_interview') { onCodingComplete(codingResults); } else { setStage('result'); setResult({ type: 'coding', results: codingResults }); } }}
                       className="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
                       style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}>
                       🏁 Finish Round
@@ -1464,8 +1725,27 @@ export default function LiveInterview() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4 transition-colors duration-300">
       <div className="max-w-2xl w-full mx-auto space-y-4">
 
-        {/* AI self-practice: show loading spinner */}
-        {role === 'student' ? (
+        {/* Manual Interview candidate waiting — wrap with ProctoringGuard */}
+        {role === 'student' && mainMode !== 'ai' ? (
+          <ProctoringGuard
+            testTitle="Manual Interview"
+            onSessionStart={() => setSessionStarted(true)}
+            onDisqualified={handleManualDisqualified}
+          >
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center space-y-6 shadow-xl">
+              <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-4xl animate-bounce" style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)' }}>✅</div>
+              <div>
+                <h2 className="text-gray-900 dark:text-white font-bold text-xl mb-2">You've Joined!</h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">Waiting for the interviewer to start...</p>
+              </div>
+              <div className="flex justify-center gap-1.5">
+                {[0, 1, 2, 3].map(i => (
+                  <div key={i} className="w-2 h-2 rounded-full bg-green-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
+            </div>
+          </ProctoringGuard>
+        ) : role === 'student' ? (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center space-y-6 shadow-xl">
             <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-4xl animate-bounce" style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)' }}>🤖</div>
             <div>
@@ -1752,6 +2032,15 @@ export default function LiveInterview() {
               <div className="w-1/2 flex flex-col overflow-hidden">
                 {isAdmin ? (
                   <div className="flex flex-col flex-1 overflow-y-auto p-4 space-y-4">
+                    {candidateDisqualified && (
+                      <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.1)', border: '2px solid rgba(239,68,68,0.4)' }}>
+                        <p className="text-red-400 font-bold text-sm">🚫 Candidate Disqualified</p>
+                        <p className="text-red-300 text-xs mt-1">
+                          Candidate was auto-disqualified after {candidateDisqualified.violations}/3 violations.
+                          Reason: {candidateDisqualified.reason}
+                        </p>
+                      </div>
+                    )}
                     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
                       <h3 className="text-white font-semibold text-sm">📤 Send Question</h3>
                       <select value={adminTopic} onChange={e => setAdminTopic(e.target.value)}

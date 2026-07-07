@@ -378,12 +378,12 @@ export default function AdminDashboard() {
     datasets: [{
       label: 'New Students',
       data: stats?.monthlyData?.map(d => d.count) || [],
-      backgroundColor: '#3b82f620',
-      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      borderColor: '#B0B0B0',
       borderWidth: 2,
       tension: 0.4,
       fill: true,
-      pointBackgroundColor: '#3b82f6',
+      pointBackgroundColor: '#FFFFFF',
       pointRadius: 5,
     }]
   };
@@ -393,8 +393,8 @@ export default function AdminDashboard() {
     datasets: [{
       data: stats?.topicData?.map(d => d.count) || [],
       backgroundColor: [
-        '#3b82f6', '#a855f7', '#22c55e',
-        '#f59e0b', '#ef4444', '#14b8a6', '#f97316'
+        '#FFFFFF', '#B0B0B0', '#707070',
+        '#3D3D3D', '#FFFFFF', '#B0B0B0', '#707070'
       ],
       borderWidth: 0,
     }]
@@ -405,74 +405,90 @@ export default function AdminDashboard() {
     datasets: [{
       label: 'Students',
       data: stats?.atsDistribution?.map(d => d.count) || [0, 0, 0, 0],
-      backgroundColor: ['#ef444440', '#f59e0b40', '#3b82f640', '#22c55e40'],
-      borderColor: ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e'],
+      backgroundColor: ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0.18)', 'rgba(255,255,255,0.28)'],
+      borderColor: ['#3D3D3D', '#707070', '#B0B0B0', '#FFFFFF'],
       borderWidth: 2,
       borderRadius: 8,
     }]
+  };
+
+  const tooltipPlugin = {
+    backgroundColor: '#1f2937',
+    borderColor: '#374151',
+    borderWidth: 1,
+    cornerRadius: 10,
+    titleFont: { family: 'Sora, sans-serif', size: 12, weight: '600' },
+    bodyFont: { family: 'Inter, sans-serif', size: 11 },
+    padding: 10,
   };
 
   const chartOptions = {
     responsive: true,
     plugins: {
       legend: { display: false },
+      tooltip: tooltipPlugin,
     },
     scales: {
       x: {
-        grid: { color: '#1f293720' },
-        ticks: { color: '#9ca3af', font: { size: 11 } }
+        grid: { color: '#1f2937' },
+        ticks: { color: '#6b7280', font: { family: 'Inter, sans-serif', size: 11 } }
       },
       y: {
-        grid: { color: '#1f293720' },
-        ticks: { color: '#9ca3af', font: { size: 11 } }
+        grid: { color: '#1f2937' },
+        ticks: { color: '#6b7280', font: { family: 'Inter, sans-serif', size: 11 } }
       }
     }
   };
 
   const doughnutOptions = {
     responsive: true,
+    cutout: '68%',
     plugins: {
+      tooltip: tooltipPlugin,
       legend: {
         position: 'bottom',
-        labels: { color: '#9ca3af', padding: 12, font: { size: 11 } }
+        labels: { color: '#6b7280', padding: 14, font: { family: 'Inter, sans-serif', size: 11 } }
       }
     }
   };
 
   if (loading) return (
-    <div className="flex items-center justify-center min-h-64">
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-950">
       <div className="text-center">
         <svg className="animate-spin h-8 w-8 mx-auto mb-3 text-blue-500" viewBox="0 0 24 24" fill="none">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
         </svg>
-        <p className="text-gray-400 text-sm">Loading analytics...</p>
+        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 14 }} className="text-gray-500 dark:text-gray-400">Loading analytics...</p>
       </div>
     </div>
   );
 
   return (
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
     <div className="max-w-7xl mx-auto p-6">
 
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+      <div className="mb-8">
+        <h1 style={{ fontFamily: 'Sora, sans-serif', fontSize: 28, fontWeight: 700, lineHeight: 1.25, letterSpacing: '-0.01em' }}
+          className="text-gray-900 dark:text-white mb-1">
           Admin Dashboard
         </h1>
-        <p className="text-gray-500 dark:text-gray-400 text-sm">
+        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 14.5 }} className="text-gray-500 dark:text-gray-400">
           Platform analytics and student performance overview
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 mb-8 p-1 rounded-xl w-fit bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
         {['overview', 'students', 'analytics'].map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className="px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all"
+            className="px-4 py-2 rounded-lg capitalize transition-all"
             style={{
+              fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500,
               backgroundColor: activeTab === tab ? 'white' : 'transparent',
-              color: activeTab === tab ? '#1f2937' : '#9ca3af',
-              boxShadow: activeTab === tab ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+              color: activeTab === tab ? '#111827' : '#6b7280',
+              boxShadow: activeTab === tab ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
             }}>
             {tab}
           </button>
@@ -486,49 +502,25 @@ export default function AdminDashboard() {
           {/* Stat cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              {
-                label: 'Total Students', value: stats?.totalStudents || 0, color: '#3b82f6', icon: (
-                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
-                )
-              },
-              {
-                label: 'Resumes Analyzed', value: stats?.totalResumes || 0, color: '#22c55e', icon: (
-                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                )
-              },
-              {
-                label: 'Interviews Done', value: stats?.totalInterviews || 0, color: '#a855f7', icon: (
-                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10" />
-                    <polygon points="10 8 16 12 10 16 10 8" />
-                  </svg>
-                )
-              },
-              {
-                label: 'Avg ATS Score', value: `${stats?.avgATS || 0}%`, color: '#f59e0b', icon: (
-                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                  </svg>
-                )
-              },
+              { label: 'Total Students', value: stats?.totalStudents || 0, color: '#3b82f6', icon: (<svg width="20" height="20" fill="none" stroke="#3b82f6" strokeWidth="1.75" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>) },
+              { label: 'Resumes Analyzed', value: stats?.totalResumes || 0, color: '#22c55e', icon: (<svg width="20" height="20" fill="none" stroke="#22c55e" strokeWidth="1.75" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>) },
+              { label: 'Interviews Done', value: stats?.totalInterviews || 0, color: '#a855f7', icon: (<svg width="20" height="20" fill="none" stroke="#a855f7" strokeWidth="1.75" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>) },
+              { label: 'Avg ATS Score', value: `${stats?.avgATS || 0}%`, color: '#f59e0b', icon: (<svg width="20" height="20" fill="none" stroke="#f59e0b" strokeWidth="1.75" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>) },
             ].map((stat, i) => (
-              <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: `${stat.color}20`, color: stat.color }}>
-                    {stat.icon}
-                  </div>
+              <div key={i}
+                className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 transition-all duration-200"
+                style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.15), 0 8px 24px -12px rgba(0,0,0,0.25)' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.2), 0 16px 32px -12px rgba(0,0,0,0.35)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.15), 0 8px 24px -12px rgba(0,0,0,0.25)'; }}
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
+                  style={{ background: `linear-gradient(135deg, ${stat.color}25, ${stat.color}0a)`, border: `1px solid ${stat.color}30` }}>
+                  {stat.icon}
                 </div>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 34, fontWeight: 600, letterSpacing: '-0.01em', color: stat.color, lineHeight: 1.1, marginBottom: 4 }}>
                   {stat.value}
                 </div>
-                <div className="text-gray-500 dark:text-gray-400 text-xs">{stat.label}</div>
+                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 500 }} className="text-gray-500 dark:text-gray-400">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -537,37 +529,45 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             {/* Monthly registrations */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-sm">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
+              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
+                className="text-gray-900 dark:text-white mb-4">
                 Student Registrations (Monthly)
               </h3>
               {stats?.monthlyData?.length > 0 ? (
                 <Line data={monthlyChartData} options={chartOptions} />
               ) : (
-                <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
-                  No data yet
+                <div className="flex flex-col items-center justify-center h-40 gap-2">
+                  <svg width="32" height="32" fill="none" stroke="#4b5563" strokeWidth="1.5" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }} className="text-gray-400">No registration data yet</p>
                 </div>
               )}
             </div>
 
             {/* Interview topics */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-sm">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
+              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
+                className="text-gray-900 dark:text-white mb-4">
                 Interview Topics Distribution
               </h3>
               {stats?.topicData?.length > 0 ? (
                 <Doughnut data={topicChartData} options={doughnutOptions} />
               ) : (
-                <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
-                  No interviews yet
+                <div className="flex flex-col items-center justify-center h-40 gap-2">
+                  <svg width="32" height="32" fill="none" stroke="#4b5563" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                  <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }} className="text-gray-400">No interviews yet</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* ATS Distribution */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-sm">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
+            style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
+              className="text-gray-900 dark:text-white mb-4">
               ATS Score Distribution
             </h3>
             <Bar data={atsChartData} options={chartOptions} />
@@ -575,22 +575,24 @@ export default function AdminDashboard() {
 
           {/* Performance summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-sm">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
+              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
+                className="text-gray-900 dark:text-white mb-4">
                 Platform Summary
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {[
                   { label: 'Avg Resume ATS Score', value: `${stats?.avgATS || 0}/100`, color: '#3b82f6', pct: stats?.avgATS || 0 },
                   { label: 'Avg Interview Score', value: `${stats?.avgInterview || 0}/10`, color: '#a855f7', pct: (stats?.avgInterview || 0) * 10 },
                 ].map((item, i) => (
                   <div key={i}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-500 dark:text-gray-400">{item.label}</span>
-                      <span className="font-medium" style={{ color: item.color }}>{item.value}</span>
+                    <div className="flex justify-between mb-1.5">
+                      <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }} className="text-gray-500 dark:text-gray-400">{item.label}</span>
+                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: item.color }}>{item.value}</span>
                     </div>
-                    <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full">
-                      <div className="h-2 rounded-full transition-all duration-700"
+                    <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full">
+                      <div className="h-1.5 rounded-full transition-all duration-700"
                         style={{ width: `${item.pct}%`, backgroundColor: item.color }} />
                     </div>
                   </div>
@@ -599,8 +601,10 @@ export default function AdminDashboard() {
             </div>
 
             {/* Recent students */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-sm">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
+              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
+                className="text-gray-900 dark:text-white mb-4">
                 Recent Registrations
               </h3>
               <div className="space-y-3">
@@ -610,16 +614,19 @@ export default function AdminDashboard() {
                       {s.name?.charAt(0)?.toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-gray-900 dark:text-white text-sm font-medium truncate">{s.name}</p>
-                      <p className="text-gray-400 text-xs truncate">{s.email}</p>
+                      <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-white truncate">{s.name}</p>
+                      <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 12 }} className="text-gray-400 truncate">{s.email}</p>
                     </div>
-                    <span className="text-xs text-gray-400">
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12 }} className="text-gray-400">
                       {new Date(s.createdAt).toLocaleDateString()}
                     </span>
                   </div>
                 ))}
                 {students.length === 0 && (
-                  <p className="text-gray-400 text-sm text-center py-4">No students yet</p>
+                  <div className="flex flex-col items-center justify-center py-6 gap-2">
+                    <svg width="28" height="28" fill="none" stroke="#4b5563" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }} className="text-gray-400">No students yet</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -650,41 +657,46 @@ export default function AdminDashboard() {
           </div>
 
           {/* Students table */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-              <div className="col-span-4 text-xs font-medium text-gray-500 uppercase tracking-wide">Student</div>
-              <div className="col-span-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Email</div>
-              <div className="col-span-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Joined</div>
-              <div className="col-span-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Action</div>
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden"
+            style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+            <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700">
+              {['Student', 'Email', 'Joined', 'Action'].map((h, i) => (
+                <div key={h} className={`${i === 0 ? 'col-span-4' : i === 1 ? 'col-span-3' : i === 2 ? 'col-span-2' : 'col-span-3'}`}
+                  style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                  className={`${i === 0 ? 'col-span-4' : i === 1 ? 'col-span-3' : i === 2 ? 'col-span-2' : 'col-span-3'} text-gray-500 dark:text-gray-400`}>
+                  {h}
+                </div>
+              ))}
             </div>
 
             {filteredStudents.length === 0 ? (
-              <div className="py-12 text-center text-gray-400">No students found</div>
+              <div className="py-12 flex flex-col items-center gap-2">
+                <svg width="32" height="32" fill="none" stroke="#4b5563" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }} className="text-gray-400">No students found</p>
+              </div>
             ) : (
               filteredStudents.map((student, i) => (
-                <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
                   <div className="col-span-4 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 text-xs font-bold flex-shrink-0">
                       {student.name?.charAt(0)?.toUpperCase()}
                     </div>
-                    <span className="text-gray-900 dark:text-white text-sm font-medium truncate">
-                      {student.name}
-                    </span>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 500 }}
+                      className="text-gray-900 dark:text-white truncate">{student.name}</span>
                   </div>
                   <div className="col-span-3 flex items-center">
-                    <span className="text-gray-500 dark:text-gray-400 text-sm truncate">{student.email}</span>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}
+                      className="text-gray-500 dark:text-gray-400 truncate">{student.email}</span>
                   </div>
                   <div className="col-span-2 flex items-center">
-                    <span className="text-gray-500 dark:text-gray-400 text-xs">
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12 }} className="text-gray-500 dark:text-gray-400">
                       {new Date(student.createdAt).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="col-span-3 flex items-center">
-                    <button
-                      onClick={() => fetchStudentDetail(student._id)}
-                      className="text-xs px-3 py-1.5 rounded-lg transition-colors"
-                      style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}
-                    >
+                    <button onClick={() => fetchStudentDetail(student._id)}
+                      className="text-xs px-3 py-1.5 rounded-lg transition-colors font-medium"
+                      style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#3b82f620', color: '#3b82f6' }}>
                       View Details →
                     </button>
                   </div>
@@ -781,34 +793,29 @@ export default function AdminDashboard() {
       {activeTab === 'analytics' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-sm">
-                Monthly Growth
-              </h3>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
+              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
+                className="text-gray-900 dark:text-white mb-4">Monthly Growth</h3>
               <Line data={monthlyChartData} options={chartOptions} />
             </div>
-
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-sm">
-                Interview Topics
-              </h3>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
+              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
+                className="text-gray-900 dark:text-white mb-4">Interview Topics</h3>
               <Doughnut data={topicChartData} options={doughnutOptions} />
             </div>
-
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 md:col-span-2">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-sm">
-                ATS Score Distribution
-              </h3>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 md:col-span-2"
+              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
+                className="text-gray-900 dark:text-white mb-4">ATS Score Distribution</h3>
               <Bar data={atsChartData} options={chartOptions} />
             </div>
           </div>
-
-          {/* Top performers */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-4 text-sm">
-              Platform Statistics
-            </h3>
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
+            style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
+              className="text-gray-900 dark:text-white mb-4">Platform Statistics</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: 'Total Students', value: stats?.totalStudents || 0, color: '#3b82f6' },
@@ -816,17 +823,18 @@ export default function AdminDashboard() {
                 { label: 'Interviews Done', value: stats?.totalInterviews || 0, color: '#a855f7' },
                 { label: 'Avg ATS Score', value: `${stats?.avgATS || 0}%`, color: '#f59e0b' },
               ].map((item, i) => (
-                <div key={i} className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                  <div className="text-2xl font-bold mb-1" style={{ color: item.color }}>
+                <div key={i} className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
+                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 28, fontWeight: 600, letterSpacing: '-0.01em', color: item.color, marginBottom: 4 }}>
                     {item.value}
                   </div>
-                  <div className="text-gray-400 text-xs">{item.label}</div>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 12 }} className="text-gray-400">{item.label}</div>
                 </div>
               ))}
             </div>
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

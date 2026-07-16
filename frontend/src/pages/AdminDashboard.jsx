@@ -480,9 +480,13 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-8 p-1 rounded-xl w-fit bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-        {['overview', 'students', 'analytics'].map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
+      <div className="flex flex-wrap gap-2 mb-8 p-1 rounded-xl w-fit bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
+        {['overview', 'students', 'analytics', 'bulk screening', 'skill detection'].map(tab => (
+          <button key={tab} onClick={() => {
+            if (tab === 'bulk screening') navigate('/bulk-screening');
+            else if (tab === 'skill detection') navigate('/fakeskill');
+            else setActiveTab(tab);
+          }}
             className="px-4 py-2 rounded-lg capitalize transition-all"
             style={{
               fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500,

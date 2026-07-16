@@ -149,7 +149,7 @@ export default function Dashboard() {
         </p>
 
         {/* Feature cards */}
-        <div className="grid gap-[24px] flex-1 pb-4"
+        <div className="grid gap-[24px] pb-4"
           style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))' }}>
           {features.map((f, i) => (
             <div
@@ -161,7 +161,7 @@ export default function Dashboard() {
                 cursor: f.path ? 'pointer' : 'default',
                 opacity: f.path ? 1 : 0.6,
                 boxShadow: `0 1px 2px rgba(0,0,0,0.15), 0 4px 16px -8px rgba(0,0,0,0.2), inset 0 0 0 1px ${f.accent}15`,
-                minHeight: '250px'
+                minHeight: '360px'
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.transform = 'translateY(-4px)';

@@ -156,10 +156,16 @@ const completeTechnicalInterview = async (req, res) => {
         title: 'Technical Interview Completed',
         message: `You completed a technical interview session (${reports.length} questions). Overall score: ${summary.overallScore || 0}/10.`,
         emailFn: async () => {
-          const user = await User.findById(req.user.id).select('email name');
-          if (user && user.email) {
-            const { sendTechnicalInterviewReport: sendEmail } = require('../utils/emailService');
-            await sendEmail(user.email, user.name, { ...summary, reports });
+          const userEmail = req.user.email;
+          const userName = req.user.name;
+          const { sendTechnicalInterviewReport: sendEmail } = require('../utils/emailService');
+          if (userEmail) {
+            await sendEmail(userEmail, userName, { ...summary, reports });
+          } else {
+            const user = await User.findById(req.user.id).select('email name');
+            if (user && user.email) {
+              await sendEmail(user.email, user.name, { ...summary, reports });
+            }
           }
         }
       });

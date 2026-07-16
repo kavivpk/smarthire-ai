@@ -7,10 +7,12 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export function useProctoring({ onDisqualified, active = false }) {
-  const [stream, setStream] = useState(null);
+export function useProctoring({ onDisqualified, active = false, existingStream = null }) {
+  // If an existingStream is provided (renderAsOverlay mode), use it directly;
+  // otherwise start with null and wait for requestMediaPermissions.
+  const [stream, setStream] = useState(existingStream);
   const [screenStream, setScreenStream] = useState(null);
-  const [permissionGranted, setPermissionGranted] = useState(false);
+  const [permissionGranted, setPermissionGranted] = useState(existingStream != null);
   const [permissionError, setPermissionError] = useState('');
   const [violations, setViolations] = useState(0);
   const [warningMsg, setWarningMsg] = useState('');

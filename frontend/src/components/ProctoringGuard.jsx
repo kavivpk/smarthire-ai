@@ -25,8 +25,12 @@ export default function ProctoringGuard({
   onDisqualified,
   testTitle = 'Interview Test',
   showCameraThumbnail = true,
+  renderAsOverlay = false,  // when true: renders overlays only (no children wrapper), for use alongside existing content
+  existingStream = null,    // when renderAsOverlay=true, pass the stream from the original ProctoringGuard session
 }) {
-  const [phase, setPhase] = useState('instructions'); // instructions | active | disqualified
+  // When renderAsOverlay is true, skip instructions and treat as already active.
+  // The parent component owns the session lifecycle; we just provide monitoring UI.
+  const [phase, setPhase] = useState(renderAsOverlay ? 'active' : 'instructions'); // instructions | active | disqualified
   const [checklist, setChecklist] = useState({ camera: false, mic: false, fullscreen: false });
   const [starting, setStarting] = useState(false);
   const [cameraPreviewVisible, setCameraPreviewVisible] = useState(true);
@@ -40,6 +44,7 @@ export default function ProctoringGuard({
   const proctoring = useProctoring({
     onDisqualified: handleDisqualified,
     active: phase === 'active',
+    existingStream: renderAsOverlay ? existingStream : null,
   });
 
   // Wire stream to preview video element
@@ -55,6 +60,19 @@ export default function ProctoringGuard({
       proctoring.startFaceCheck(previewVideoRef.current);
     }
   }, [phase, proctoring.stream]);
+
+  // Hide header by toggling class on document element during test/instructions phase
+  useEffect(() => {
+    if (phase !== 'disqualified') {
+      document.documentElement.classList.add('proctoring-active');
+    } else {
+      document.documentElement.classList.remove('proctoring-active');
+    }
+    return () => {
+      document.documentElement.classList.remove('proctoring-active');
+    };
+  }, [phase]);
+
 
   // ── Step 1: Request permissions ───────────────────────────────────────────
   const handleRequestPermissions = async () => {
@@ -79,6 +97,13 @@ export default function ProctoringGuard({
   // ═══════════════════════════════════════════════════════════════════
   // DISQUALIFIED SCREEN
   // ═══════════════════════════════════════════════════════════════════
+
+  // In overlay mode, the parent handles disqualification (shows combined results screen).
+  // Don't render a full-screen takeover here — just render nothing and let parent take over.
+  if (phase === 'disqualified' && renderAsOverlay) {
+    return null;
+  }
+
   if (phase === 'disqualified') {
     return (
       <div className="fixed inset-0 z-[9999] flex items-center justify-center"
@@ -289,6 +314,83 @@ export default function ProctoringGuard({
   // ═══════════════════════════════════════════════════════════════════
   // ACTIVE TEST — render children with overlays
   // ═══════════════════════════════════════════════════════════════════
+
+  // renderAsOverlay mode: only render the fixed overlays, no wrapper div, no children.
+  // The parent renders its own content separately; this just adds violation monitoring UI
+  // as fixed-positioned elements over whatever content is currently on screen.
+  if (renderAsOverlay) {
+    return (
+      <>
+        {proctoring.warningMsg && (
+          <div className="fixed inset-0 z-[9990] flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.7)' }}>
+            <div className="max-w-sm mx-4 rounded-2xl p-6 text-center"
+              style={{ background: '#1e293b', border: '2px solid rgba(239,68,68,0.5)' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+              <p style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 16, color: '#f87171', marginBottom: 8 }}>
+                Proctoring Violation
+              </p>
+              <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#94a3b8', marginBottom: 20, lineHeight: 1.6 }}>
+                {proctoring.warningMsg}
+              </p>
+              <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#64748b', marginBottom: 16 }}>
+                Violations: {proctoring.violations}/{3}
+              </p>
+              <button onClick={proctoring.dismissWarning}
+                style={{ padding: '10px 28px', borderRadius: 10, fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600, fontSize: 14, color: '#fff', cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)', border: 'none' }}>
+                I Understand — Continue
+              </button>
+            </div>
+          </div>
+        )}
+        {showCameraThumbnail && proctoring.stream && cameraPreviewVisible && (
+          <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9980,
+            width: 140, height: 105, borderRadius: 12, overflow: 'hidden',
+            border: proctoring.faceAbsent ? '2px solid #ef4444' : '2px solid rgba(99,102,241,0.6)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.5)', cursor: 'pointer',
+            transition: 'border-color 0.3s' }}
+            title="Click to hide/show camera preview"
+            onClick={() => setCameraPreviewVisible(false)}>
+            <video ref={previewVideoRef} autoPlay playsInline muted
+              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+            {proctoring.faceAbsent && (
+              <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, textAlign: 'center',
+                fontFamily: 'Inter, sans-serif', fontSize: 10, fontWeight: 600,
+                color: '#ef4444', background: 'rgba(0,0,0,0.7)', padding: '2px 0' }}>
+                Face not detected
+              </div>
+            )}
+            <div style={{ position: 'absolute', top: 4, left: 6, fontFamily: 'Inter, sans-serif',
+              fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
+              👁 Monitored · ×close
+            </div>
+          </div>
+        )}
+        {showCameraThumbnail && proctoring.stream && !cameraPreviewVisible && (
+          <button onClick={() => setCameraPreviewVisible(true)}
+            style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9980,
+              padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
+              fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: 600,
+              color: '#818cf8', background: 'rgba(99,102,241,0.15)',
+              border: '1px solid rgba(99,102,241,0.3)' }}>
+            📷 Show Camera
+          </button>
+        )}
+        {proctoring.violations > 0 && !proctoring.isDisqualified && (
+          <div style={{ position: 'fixed', top: 12, right: 16, zIndex: 9970,
+            padding: '4px 10px', borderRadius: 20,
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
+            color: '#f87171', background: 'rgba(239,68,68,0.12)',
+            border: '1px solid rgba(239,68,68,0.3)' }}>
+            ⚠ {proctoring.violations}/{3} warnings
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       {/* Warning modal */}

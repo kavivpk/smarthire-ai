@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+﻿const nodemailer = require('nodemailer');
 
 const createTransporter = () => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -21,7 +21,7 @@ const sendRoomInvite = async (toEmail, roomId, studentName, interviewerName) => 
   const mailOptions = {
     from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
     to: toEmail,
-    subject: `🎯 Interview Room Invitation — ${roomId}`,
+    subject: `ðŸŽ¯ Interview Room Invitation â€” ${roomId}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -56,7 +56,7 @@ const sendRoomInvite = async (toEmail, roomId, studentName, interviewerName) => 
             <div class="subtitle">AI-Powered Interview Platform</div>
           </div>
           <div class="body">
-            <div class="greeting">Hello, ${studentName || 'Student'}! 👋</div>
+            <div class="greeting">Hello, ${studentName || 'Student'}! ðŸ‘‹</div>
             <div class="message">
               You have been invited to join a live AI interview session on SmartHire AI.
               Please find your room details below.
@@ -81,7 +81,7 @@ const sendRoomInvite = async (toEmail, roomId, studentName, interviewerName) => 
             </div>
 
             <a href="${appUrl}/live-interview" class="btn" style="display: block; background-color: #1e40af; color: #ffffff; text-decoration: none; padding: 14px 24px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 16px; border: none;">
-              <span style="color: #ffffff; text-decoration: none;">🚀 Join Interview Now</span>
+              <span style="color: #ffffff; text-decoration: none;">ðŸš€ Join Interview Now</span>
             </a>
 
             <div class="steps">
@@ -107,7 +107,7 @@ const sendRoomInvite = async (toEmail, roomId, studentName, interviewerName) => 
             </div>
           </div>
           <div class="footer">
-            © 2024 SmartHire AI · AI-Powered Placement Intelligence
+            Â© 2024 SmartHire AI Â· AI-Powered Placement Intelligence
           </div>
         </div>
       </body>
@@ -124,7 +124,7 @@ const sendAptitudeResult = async (toEmail, studentName, resultData) => {
   const mailOptions = {
     from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
     to: toEmail,
-    subject: `📊 Your Aptitude Assessment Results`,
+    subject: `ðŸ“Š Your Aptitude Assessment Results`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -154,7 +154,7 @@ const sendAptitudeResult = async (toEmail, studentName, resultData) => {
             <div class="subtitle">Aptitude Test Result</div>
           </div>
           <div class="body">
-            <div class="greeting">Hello, ${studentName || 'Student'}! 👋</div>
+            <div class="greeting">Hello, ${studentName || 'Student'}! ðŸ‘‹</div>
             <div class="message">
               Thank you for completing the aptitude assessment on SmartHire AI. 
               We have successfully evaluated your test.
@@ -184,7 +184,7 @@ const sendAptitudeResult = async (toEmail, studentName, resultData) => {
             </div>
           </div>
           <div class="footer">
-            © 2024 SmartHire AI · AI-Powered Placement Intelligence
+            Â© 2024 SmartHire AI Â· AI-Powered Placement Intelligence
           </div>
         </div>
       </body>
@@ -261,7 +261,7 @@ const sendTechnicalInterviewReport = async (toEmail, studentName, reportData) =>
 };
 
 /**
- * sendCombinedAIInterviewResult — sent immediately after AI Interview completion (Phase 3.5)
+ * sendCombinedAIInterviewResult â€” sent immediately after AI Interview completion (Phase 3.5)
  * Includes Aptitude + Coding + Technical section scores, overall score, violation/disqualification info.
  */
 const sendCombinedAIInterviewResult = async (toEmail, studentName, data) => {
@@ -277,28 +277,46 @@ const sendCombinedAIInterviewResult = async (toEmail, studentName, data) => {
 
   const statusBanner = disqualified
     ? `<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#dc2626;font-weight:600;">
-        🚫 This session was terminated due to repeated proctoring violations (${violations}/3 warnings reached).
+        ðŸš« This session was terminated due to repeated proctoring violations (${violations}/3 warnings reached).
        </div>`
     : '';
 
+  // Aptitude: per-category rows
   const catRows = aptitude.categoryScores
     ? Object.entries(aptitude.categoryScores).map(([cat, s]) =>
         `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#374151;">${cat}</td>
-         <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#2563eb;">${s.correct}/${s.total}</td></tr>`
+         <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#2563eb;">${s.correct} / ${s.total}</td></tr>`
       ).join('')
     : '';
+  const aptTotal = aptitude.correct || 0;
+  const aptMax   = aptitude.total   || 0;
+
+  // Coding: per-problem rows
+  const codingRows = Array.isArray(coding.results) && coding.results.length > 0
+    ? coding.results.map((r, i) =>
+        `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#374151;">Problem ${i + 1}: ${r.title || ''}</td>
+         <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#2563eb;">${r.score || 0} / 10</td></tr>`
+      ).join('')
+    : '';
+  const codTotal = coding.results && coding.results.length > 0
+    ? coding.results.reduce((sum, r) => sum + (r.score || 0), 0)
+    : 0;
+  const codMax   = (coding.results?.length || 0) * 10;
+
+  // Technical: scale from 0-10 socket score to /40 pts
+  const techScore = Math.round(((technical.overallScore || 0) / 10) * 40);
 
   const mailOptions = {
     from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
     to: toEmail,
     subject: disqualified
-      ? '⛔ AI Interview Result — Session Disqualified'
-      : '📊 Your AI Interview Results — Full Report',
+      ? 'â›” AI Interview Result â€” Session Disqualified'
+      : 'ðŸ“Š Your AI Interview Results â€” Full Report',
     html: `<!DOCTYPE html>
     <html><head>
     <style>
       body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0;}
-      .wrap{max-width:560px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);}
+      .wrap{max-width:580px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);}
       .hdr{background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:28px 32px;color:#fff;}
       .logo{font-size:22px;font-weight:bold;margin-bottom:4px;}
       .logo span{color:#60a5fa;}
@@ -306,63 +324,71 @@ const sendCombinedAIInterviewResult = async (toEmail, studentName, data) => {
       .body{padding:28px 32px;}
       .sec{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:16px;}
       .sec-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;margin-bottom:10px;}
-      .score-row{display:flex;justify-content:space-between;align-items:center;}
-      .score-big{font-size:28px;font-weight:800;color:#1d4ed8;}
+      .score-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+      .score-big{font-size:26px;font-weight:800;color:#1d4ed8;}
       .overall{background:linear-gradient(135deg,#1e3a5f,#2563eb);border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;}
       .ov-label{color:#93c5fd;font-size:12px;letter-spacing:.5px;text-transform:uppercase;}
-      .ov-val{font-size:38px;font-weight:800;color:#fff;margin-top:4px;}
+      .ov-val{font-size:36px;font-weight:800;color:#fff;margin-top:4px;}
       table{width:100%;border-collapse:collapse;font-size:13px;}
+      .tr-total td{padding:8px;font-weight:700;color:#1d4ed8;border-top:2px solid #e2e8f0;}
+      .na{color:#6b7280;font-size:13px;font-style:italic;}
       .ftr{background:#f9fafb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;}
     </style></head>
     <body>
     <div class="wrap">
       <div class="hdr">
         <div class="logo">SmartHire <span>AI</span></div>
-        <div class="sub">AI Interview — Complete Result Report</div>
+        <div class="sub">AI Interview â€” Complete Result Report</div>
       </div>
       <div class="body">
-        <p style="color:#374151;font-size:16px;font-weight:600;margin-bottom:4px;">Hello, ${studentName || 'Candidate'}! 👋</p>
-        <p style="color:#6b7280;font-size:14px;margin-bottom:20px;">
-          Your AI Interview session has ended. Here is your complete score breakdown.
-        </p>
+        <p style="color:#374151;font-size:16px;font-weight:600;margin-bottom:4px;">Hello, ${studentName || 'Candidate'}! ðŸ‘‹</p>
+        <p style="color:#6b7280;font-size:14px;margin-bottom:20px;">Your AI Interview session has ended. Here is your complete score breakdown.</p>
         ${statusBanner}
+
+        <!-- Grand Total -->
         <div class="overall">
-          <div class="ov-label">Overall Score</div>
-          <div class="ov-val">${overall.score || 0} / ${overall.outOf || 90} <span style="font-size:18px;">(${overall.percent || 0}%)</span></div>
-        </div>
-
-        <!-- Aptitude -->
-        <div class="sec">
-          <div class="sec-title">🧠 Aptitude Section</div>
-          <div class="score-row">
-            <span style="color:#374151;font-size:14px;">Score</span>
-            <span class="score-big">${aptitude.correct || 0} / ${aptitude.total || 0}</span>
-          </div>
-          ${catRows ? `<table style="margin-top:10px;">${catRows}</table>` : ''}
-        </div>
-
-        <!-- Coding -->
-        <div class="sec">
-          <div class="sec-title">💻 Coding Section</div>
-          <div class="score-row">
-            <span style="color:#374151;font-size:14px;">Avg Score</span>
-            <span class="score-big">${coding.avgScore || 0} / 10</span>
-          </div>
-          <p style="color:#6b7280;font-size:12px;margin-top:6px;">Problems solved: ${coding.solved || 0} / ${coding.total || 0}</p>
-        </div>
-
-        <!-- Technical Q&A -->
-        <div class="sec">
-          <div class="sec-title">🗣️ Technical Q&A Section</div>
-          <div class="score-row">
-            <span style="color:#374151;font-size:14px;">Overall Score</span>
-            <span class="score-big">${technical.overallScore || 0} / 10</span>
+          <div class="ov-label">Grand Total</div>
+          <div class="ov-val">${overall.score || 0} / ${overall.outOf || 150} <span style="font-size:18px;">(${overall.percent || 0}%)</span></div>
+          <div style="color:#93c5fd;font-size:13px;margin-top:6px;font-weight:600;">
+            Status: ${disqualified ? 'ðŸš« Disqualified' : 'âœ… Completed'}
           </div>
         </div>
 
-        ${violations > 0 ? `<p style="color:#dc2626;font-size:13px;text-align:center;margin-top:10px;">⚠ ${violations} proctoring violation(s) recorded during this session.</p>` : ''}
+        <!-- APTITUDE -->
+        <div class="sec">
+          <div class="sec-title">ðŸ§  Aptitude</div>
+          ${aptMax > 0 ? `
+          <table>
+            ${catRows}
+            <tr class="tr-total"><td>Aptitude Total</td><td>${aptTotal} / ${aptMax}</td></tr>
+          </table>` : `<p class="na">Not attempted</p>`}
+        </div>
+
+        <!-- CODING -->
+        <div class="sec">
+          <div class="sec-title">ðŸ’» Coding</div>
+          ${codMax > 0 ? `
+          <table>
+            ${codingRows}
+            <tr class="tr-total"><td>Coding Total</td><td>${codTotal} / ${codMax}</td></tr>
+          </table>` : `<p class="na">Not attempted</p>`}
+        </div>
+
+        <!-- TECHNICAL -->
+        <div class="sec">
+          <div class="sec-title">ðŸ—£ï¸ Technical Q&amp;A</div>
+          ${(technical.overallScore !== undefined && technical.overallScore !== null && technical.overallScore !== 0) || aptMax > 0 && codMax > 0 ? `
+          <div class="score-row">
+            <span style="color:#374151;font-size:14px;">Technical Total</span>
+            <span class="score-big">${techScore} / 40</span>
+          </div>
+          <p style="color:#6b7280;font-size:12px;margin-top:2px;">Raw score: ${technical.overallScore || 0} / 10</p>`
+          : `<p class="na">Not attempted</p>`}
+        </div>
+
+        ${violations > 0 ? `<p style="color:#dc2626;font-size:13px;text-align:center;margin-top:8px;">âš  ${violations} proctoring violation(s) recorded during this session.</p>` : ''}
       </div>
-      <div class="ftr">© ${new Date().getFullYear()} SmartHire AI · AI-Powered Hiring Intelligence</div>
+      <div class="ftr">Â© ${new Date().getFullYear()} SmartHire AI Â· AI-Powered Hiring Intelligence</div>
     </div>
     </body></html>`,
   };
@@ -401,7 +427,7 @@ async function sendCodingReport(toEmail, studentName, reportData) {
   const mailOptions = {
     from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
     to: toEmail,
-    subject: `💻 Coding Assessment Report — ${reportData.problemTitle || 'Problem'}`,
+    subject: `ðŸ’» Coding Assessment Report â€” ${reportData.problemTitle || 'Problem'}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -414,7 +440,7 @@ async function sendCodingReport(toEmail, studentName, reportData) {
           </div>
 
           <div style="padding:28px;">
-            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Hello, ${studentName || 'Candidate'}! 👋</p>
+            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Hello, ${studentName || 'Candidate'}! ðŸ‘‹</p>
             <p style="color:#6b7280;font-size:13px;margin:0 0 24px;">
               Your coding submission for <strong>${reportData.problemTitle || 'the problem'}</strong> has been evaluated.
             </p>
@@ -479,7 +505,7 @@ async function sendCodingReport(toEmail, studentName, reportData) {
           </div>
 
           <div style="background:#f9fafb;padding:16px;text-align:center;font-size:12px;color:#9ca3af;">
-            © 2024 SmartHire AI · AI-Powered Placement Intelligence
+            Â© 2024 SmartHire AI Â· AI-Powered Placement Intelligence
           </div>
         </div>
       </body>
@@ -507,7 +533,7 @@ async function sendLoginSummary(toEmail, studentName, summaryData) {
   const mailOptions = {
     from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
     to: toEmail,
-    subject: `👋 Welcome back, ${studentName || 'Student'}! — Your SmartHire AI Progress`,
+    subject: `ðŸ‘‹ Welcome back, ${studentName || 'Student'}! â€” Your SmartHire AI Progress`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -518,7 +544,7 @@ async function sendLoginSummary(toEmail, studentName, summaryData) {
             <div style="color:#93c5fd;font-size:13px;margin-top:4px;">Login Summary</div>
           </div>
           <div style="padding:28px;">
-            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Welcome back, ${studentName || 'Student'}! 👋</p>
+            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Welcome back, ${studentName || 'Student'}! ðŸ‘‹</p>
             <p style="color:#6b7280;font-size:13px;margin:0 0 24px;">
               Here's a quick look at your placement preparation progress so far.
             </p>
@@ -546,11 +572,11 @@ async function sendLoginSummary(toEmail, studentName, summaryData) {
 
             <p style="font-size:13px;color:#6b7280;text-align:center;margin:0;">
               Keep practising to improve your placement readiness!<br>
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" style="color:#2563eb;font-weight:bold;">Open SmartHire AI →</a>
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" style="color:#2563eb;font-weight:bold;">Open SmartHire AI â†’</a>
             </p>
           </div>
           <div style="background:#f9fafb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">
-            © 2024 SmartHire AI · AI-Powered Placement Intelligence
+            Â© 2024 SmartHire AI Â· AI-Powered Placement Intelligence
           </div>
         </div>
       </body>
@@ -574,7 +600,7 @@ async function sendHRInterviewReport(toEmail, studentName, reportData) {
   const mailOptions = {
     from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
     to: toEmail,
-    subject: `🤝 HR Interview Report — SmartHire AI`,
+    subject: `ðŸ¤ HR Interview Report â€” SmartHire AI`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -585,7 +611,7 @@ async function sendHRInterviewReport(toEmail, studentName, reportData) {
             <div style="color:#ddd6fe;font-size:13px;margin-top:4px;">HR Interview Report</div>
           </div>
           <div style="padding:28px;">
-            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Hello, ${studentName || 'Candidate'}! 👋</p>
+            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Hello, ${studentName || 'Candidate'}! ðŸ‘‹</p>
             <p style="color:#6b7280;font-size:13px;margin:0 0 24px;">Your HR interview has been evaluated. Here are your results.</p>
 
             <div style="background:#f5f3ff;border:2px solid #7c3aed;border-radius:12px;padding:16px;text-align:center;margin-bottom:20px;">
@@ -606,7 +632,7 @@ async function sendHRInterviewReport(toEmail, studentName, reportData) {
             </div>` : ''}
           </div>
           <div style="background:#f9fafb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">
-            © 2024 SmartHire AI · AI-Powered Placement Intelligence
+            Â© 2024 SmartHire AI Â· AI-Powered Placement Intelligence
           </div>
         </div>
       </body>
@@ -626,7 +652,7 @@ async function sendPlacementRecommendationReport(toEmail, studentName, reportDat
   const mailOptions = {
     from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
     to: toEmail,
-    subject: `🎯 Your Placement Recommendation Report — SmartHire AI`,
+    subject: `ðŸŽ¯ Your Placement Recommendation Report â€” SmartHire AI`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -637,7 +663,7 @@ async function sendPlacementRecommendationReport(toEmail, studentName, reportDat
             <div style="color:#bae6fd;font-size:13px;margin-top:4px;">Placement Recommendation Report</div>
           </div>
           <div style="padding:28px;">
-            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Hello, ${studentName || 'Candidate'}! 🎯</p>
+            <p style="font-size:16px;font-weight:bold;color:#1f2937;margin:0 0 6px;">Hello, ${studentName || 'Candidate'}! ðŸŽ¯</p>
             <p style="color:#6b7280;font-size:13px;margin:0 0 24px;">Based on all your assessments, here is your personalized placement recommendation.</p>
 
             <!-- Placement Chance -->
@@ -678,21 +704,21 @@ async function sendPlacementRecommendationReport(toEmail, studentName, reportDat
             <!-- Strengths -->
             ${(reportData.strengths || []).length ? `
             <div style="margin-bottom:16px;">
-              <p style="font-size:13px;font-weight:bold;color:#374151;margin:0 0 8px;">✅ Strengths</p>
+              <p style="font-size:13px;font-weight:bold;color:#374151;margin:0 0 8px;">âœ… Strengths</p>
               <ul style="margin:0;padding-left:20px;">${listItems(reportData.strengths)}</ul>
             </div>` : ''}
 
             <!-- Skills to Improve -->
             ${(reportData.skillsToImprove || []).length ? `
             <div style="margin-bottom:16px;">
-              <p style="font-size:13px;font-weight:bold;color:#374151;margin:0 0 8px;">📈 Skills to Improve</p>
+              <p style="font-size:13px;font-weight:bold;color:#374151;margin:0 0 8px;">ðŸ“ˆ Skills to Improve</p>
               <ul style="margin:0;padding-left:20px;">${listItems(reportData.skillsToImprove)}</ul>
             </div>` : ''}
 
             <!-- Learning Roadmap -->
             ${(reportData.learningRoadmap || []).length ? `
             <div style="margin-bottom:20px;">
-              <p style="font-size:13px;font-weight:bold;color:#374151;margin:0 0 8px;">🗺️ Learning Roadmap</p>
+              <p style="font-size:13px;font-weight:bold;color:#374151;margin:0 0 8px;">ðŸ—ºï¸ Learning Roadmap</p>
               <ul style="margin:0;padding-left:20px;">${listItems(reportData.learningRoadmap)}</ul>
             </div>` : ''}
 
@@ -704,7 +730,7 @@ async function sendPlacementRecommendationReport(toEmail, studentName, reportDat
             </div>` : ''}
           </div>
           <div style="background:#f9fafb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">
-            © 2024 SmartHire AI · AI-Powered Placement Intelligence
+            Â© 2024 SmartHire AI Â· AI-Powered Placement Intelligence
           </div>
         </div>
       </body>
@@ -714,3 +740,4 @@ async function sendPlacementRecommendationReport(toEmail, studentName, reportDat
 
   return transporter.sendMail(mailOptions);
 }
+

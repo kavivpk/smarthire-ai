@@ -183,7 +183,7 @@ export default function MockInterview() {
     : 0;
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
+    <div className="max-w-[1600px] mx-auto p-6">
 
       {/* Stage 1 — Mode Select */}
       {stage === 'select' && (

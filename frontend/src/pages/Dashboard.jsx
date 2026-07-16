@@ -14,8 +14,7 @@ export default function Dashboard() {
       .catch(() => setTechnicalStats(null));
   }, []);
 
-  const features = [
-    // ── Student-facing core features (always visible) ──
+  const studentFeatures = [
     {
       symbol: (
         <svg width="22" height="22" fill="none" stroke="#3b82f6" strokeWidth="1.75" viewBox="0 0 24 24">
@@ -41,10 +40,12 @@ export default function Dashboard() {
           <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" fill="#ef4444" />
         </svg>
       ),
-      title: 'Live Interview', desc: 'AI Interview · Manual Interview', accent: '#ef4444', path: '/live-interview',
-    },
-    // ── Admin-only features ──
-    ...(isAdmin ? [{
+      title: 'Live Interview', desc: 'Take AI or Manual Interviews', accent: '#ef4444', path: '/live-interview',
+    }
+  ];
+
+  const adminFeatures = [
+    {
       symbol: (
         <svg width="22" height="22" fill="none" stroke="#14b8a6" strokeWidth="1.75" viewBox="0 0 24 24">
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -61,14 +62,35 @@ export default function Dashboard() {
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       ),
-      title: 'Bulk Screening', desc: 'Parse and rank resumes', accent: '#3b82f6', path: '/bulk-screening',
-    }] : []),
+      title: 'Bulk Screening', desc: 'Parse, rank, and shortlist resumes', accent: '#3b82f6', path: '/bulk-screening',
+    },
+    {
+      symbol: (
+        <svg width="22" height="22" fill="none" stroke="#ea580c" strokeWidth="1.75" viewBox="0 0 24 24">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <path d="M12 8v4" />
+          <path d="M12 16h.01" />
+        </svg>
+      ),
+      title: 'Fake Skill Detection', desc: 'Verify resume credibility and claims', accent: '#ea580c', path: '/fakeskill',
+    },
+    {
+      symbol: (
+        <svg width="22" height="22" fill="none" stroke="#ef4444" strokeWidth="1.75" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" fill="#ef4444" />
+        </svg>
+      ),
+      title: 'Live Interviews', desc: 'Conduct or Review Interviews', accent: '#ef4444', path: '/live-interview',
+    }
   ];
+
+  const features = isAdmin ? adminFeatures : studentFeatures;
+
 
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-      <div style={{ maxWidth: 1600, margin: '0 auto', padding: '24px 24px 48px' }}>
+    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
+      <div className="flex-1 flex flex-col" style={{ maxWidth: 1600, width: '100%', margin: '0 auto', padding: '24px' }}>
 
         {/* Welcome card */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-5 transition-colors"
@@ -79,12 +101,12 @@ export default function Dashboard() {
           </h2>
           <p className="text-gray-500 dark:text-gray-400" style={{ fontFamily: 'Inter, sans-serif', fontSize: 14.5 }}>
             Role: <span className="text-blue-500 font-semibold capitalize">{user.role}</span>
-            &nbsp;·&nbsp; Start your placement preparation today
+            &nbsp;·&nbsp; {isAdmin ? 'Manage platform activities and analytics' : 'Start your placement preparation today'}
           </p>
         </div>
 
         {/* Technical Stats Widget */}
-        {technicalStats?.recent && (
+        {!isAdmin && technicalStats?.recent && (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 mb-5"
             style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.1), 0 4px 16px -8px rgba(0,0,0,0.2)' }}>
             <div className="flex items-center justify-between gap-4">
@@ -121,48 +143,57 @@ export default function Dashboard() {
         )}
 
         {/* Features label */}
-        <p className="text-gray-500 dark:text-gray-400 font-semibold mb-3"
+        <p className="text-gray-500 dark:text-gray-400 font-semibold mb-3 mt-6"
           style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Features
+          {isAdmin ? 'Admin Features' : 'Student Features'}
         </p>
 
         {/* Feature cards */}
-        <div className="grid gap-[18px]"
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))' }}>
+        <div className="grid gap-[24px] flex-1 pb-4"
+          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))' }}>
           {features.map((f, i) => (
             <div
               key={i}
               onClick={() => f.path && navigate(f.path)}
-              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 transition-all duration-200"
+              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 transition-all duration-200 flex flex-col text-center"
               style={{
-                borderTop: `3px solid ${f.accent}`,
+                borderTop: `4px solid ${f.accent}`,
                 cursor: f.path ? 'pointer' : 'default',
                 opacity: f.path ? 1 : 0.6,
                 boxShadow: `0 1px 2px rgba(0,0,0,0.15), 0 4px 16px -8px rgba(0,0,0,0.2), inset 0 0 0 1px ${f.accent}15`,
+                minHeight: '250px'
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = `0 4px 6px rgba(0,0,0,0.2), 0 16px 32px -12px rgba(0,0,0,0.35), inset 0 0 0 1px ${f.accent}25`;
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = `0 6px 12px rgba(0,0,0,0.1), 0 24px 48px -12px rgba(0,0,0,0.25), inset 0 0 0 1px ${f.accent}25`;
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.transform = 'translateY(0)';
                 e.currentTarget.style.boxShadow = `0 1px 2px rgba(0,0,0,0.15), 0 4px 16px -8px rgba(0,0,0,0.2), inset 0 0 0 1px ${f.accent}15`;
               }}
             >
-              <div className="mb-4 w-10 h-10 rounded-lg flex items-center justify-center"
-                style={{
-                  background: `linear-gradient(135deg, ${f.accent}25, ${f.accent}0a)`,
-                  border: `1px solid ${f.accent}30`,
-                }}>
-                {f.symbol}
+              <div className="flex flex-col items-center justify-center flex-1">
+                <div className="mb-6 w-16 h-16 rounded-2xl flex items-center justify-center"
+                  style={{
+                    background: `linear-gradient(135deg, ${f.accent}25, ${f.accent}0a)`,
+                    border: `1px solid ${f.accent}30`,
+                  }}>
+                  <div style={{ transform: 'scale(1.5)' }}>{f.symbol}</div>
+                </div>
+                <h3 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 24 }}
+                  className="text-gray-900 dark:text-white mb-3">{f.title}</h3>
+                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 15 }}
+                  className="text-gray-500 dark:text-gray-400 mb-6">{f.desc}</p>
               </div>
-              <h3 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 600, fontSize: 16 }}
-                className="text-gray-900 dark:text-white mb-1">{f.title}</h3>
-              <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}
-                className="text-gray-500 dark:text-gray-400 mb-4">{f.desc}</p>
-              <div className="flex items-center justify-end">
-                <span className="text-xs text-gray-400 dark:text-gray-500" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  {f.path ? 'Open →' : 'Coming soon'}
+              <div className="flex items-center justify-center mt-auto">
+                <span className="text-sm font-semibold px-6 py-2 rounded-full transition-colors" 
+                  style={{ 
+                    fontFamily: 'Inter, sans-serif', 
+                    color: f.accent, 
+                    background: `${f.accent}15`,
+                    border: `1px solid ${f.accent}30`
+                  }}>
+                  {f.path ? 'Open Feature →' : 'Coming soon'}
                 </span>
               </div>
             </div>

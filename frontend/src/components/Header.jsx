@@ -20,7 +20,7 @@ export default function Header() {
     { label: 'Resume', path: '/resume' },
     { label: 'Interview', path: '/interview' },
     { label: 'Skill Check', path: '/fakeskill' },
-    ...(user.role === 'admin' ? [{ label: 'Bulk Screening', path: '/bulk-screening' }] : []),
+    { label: 'Bulk Screening', path: '/bulk-screening' },
   ];
 
   const isActive = (path) => location.pathname === path;

@@ -37,7 +37,7 @@ export default function ResumeAnalyzer() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-      <div className="max-w-3xl mx-auto p-6">
+      <div className="max-w-[1600px] mx-auto p-6">
 
         {!result && (
           <div className={cardCls} style={{ ...cardShadow, padding: 32 }}>

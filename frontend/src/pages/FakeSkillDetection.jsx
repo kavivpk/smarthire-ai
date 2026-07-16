@@ -34,7 +34,7 @@ export default function FakeSkillDetection() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-[1600px] mx-auto p-6">
         {!result ? (
           <div className="space-y-4">
             <div className={cardCls} style={{...shadow,padding:24}}>

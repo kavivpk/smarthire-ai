@@ -121,3 +121,9 @@ html.light .skeleton {
   padding: 8px 12px !important;
   pointer-events: none;
 }
+
+/* Hide header navigation bar during proctored assessment */
+.proctoring-active header {
+  display: none !important;
+}
+

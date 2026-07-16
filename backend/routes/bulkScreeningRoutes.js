@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024, files: 30 },
+  limits: { fileSize: 5 * 1024 * 1024, files: 1000 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/pdf') cb(null, true);
     else cb(new Error('Only PDF files are allowed'));
@@ -59,7 +59,8 @@ function parseRequirements(requirementsText) {
   return null;
 }
 
-router.post('/analyze', protect, adminOnly, upload.array('resumes', 30), async (req, res) => {
+router.post('/analyze', protect, upload.array('resumes', 1000), async (req, res) => {
+
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: 'Please upload at least one resume PDF' });

@@ -447,25 +447,38 @@ const submitAptitude = async (req, res) => {
     });
     const totalScore = Math.round((correct / qBank.length) * 100);
 
-    // Send standalone email only when NOT part of the combined AI Interview flow
-    // (the combined flow sends sendCombinedAIInterviewResult via /session/save instead)
-    const { skipEmail } = req.body;
-    if (req.user && req.user.id && !skipEmail) {
-      User.findById(req.user.id).then(user => {
-        if (user && user.email) {
-          sendAptitudeResult(user.email, user.name, { totalScore, correct, total: qBank.length, categoryScores })
-            .catch(err => console.error('Failed to send aptitude result email:', err));
-        }
-      }).catch(err => console.error('Error fetching user for email:', err));
+    // Send standalone email when aptitude is completed/submitted
+    if (req.user && req.user.id) {
+      const email = req.user.email;
+
+      const name = req.user.name;
+
+      if (email) {
+        sendAptitudeResult(email, name, { totalScore, correct, total: qBank.length, categoryScores })
+          .catch(err => console.error('Failed to send aptitude result email:', err));
+      } else {
+        User.findById(req.user.id).select('email name').then(user => {
+          if (user && user.email) {
+            sendAptitudeResult(user.email, user.name, { totalScore, correct, total: qBank.length, categoryScores })
+              .catch(err => console.error('Failed to send aptitude result email:', err));
+          }
+        }).catch(err => console.error('Error fetching user for email:', err));
+      }
 
       notify(req.user.id, {
         type: 'aptitude',
         title: 'Aptitude Test Completed',
         message: `You scored ${totalScore}% (${correct}/${qBank.length} correct) in the aptitude assessment.`,
         emailFn: async () => {
-          const user = await User.findById(req.user.id).select('email name');
-          if (user && user.email) {
-            await sendAptitudeResult(user.email, user.name, { totalScore, correct, total: qBank.length, categoryScores });
+          const userEmail = req.user.email;
+          const userName = req.user.name;
+          if (userEmail) {
+            await sendAptitudeResult(userEmail, userName, { totalScore, correct, total: qBank.length, categoryScores });
+          } else {
+            const user = await User.findById(req.user.id).select('email name');
+            if (user && user.email) {
+              await sendAptitudeResult(user.email, user.name, { totalScore, correct, total: qBank.length, categoryScores });
+            }
           }
         }
       });
@@ -689,25 +702,39 @@ const saveInterviewSession = async (req, res) => {
       aptitudeResult:  aptitudeResult  || {},
       codingResult:    codingResult    || {},
       technicalResult: technicalResult || {},
-      overallScore:    overallScore    || { score: 0, outOf: 90, percent: 0 },
+      overallScore:    overallScore    || { score: 0, outOf: 150, percent: 0 },
       violations:      violations      || 0,
       disqualified:    disqualified    || false,
       completedAt:     new Date(),
     });
 
-    // Fire-and-forget email — never blocks the response
-    User.findById(req.user.id).select('email name').then(user => {
-      if (user && user.email) {
-        sendCombinedAIInterviewResult(user.email, user.name, {
+    // Always fetch user from DB to get fresh email/name — JWT may not have latest values
+    const sendEmail = async () => {
+      try {
+        const user = await User.findById(req.user.id).select('email name');
+        const email = user?.email || req.user.email;
+        const name  = user?.name  || req.user.name;
+        if (!email) {
+          console.error('Combined AI Interview email skipped: no email found for user', req.user.id);
+          return;
+        }
+        console.log('Sending combined AI interview result to:', email);
+        await sendCombinedAIInterviewResult(email, name, {
           aptitude:     aptitudeResult  || {},
           coding:       codingResult    || {},
           technical:    technicalResult || {},
           overall:      overallScore    || {},
           violations:   violations      || 0,
           disqualified: disqualified    || false,
-        }).catch(err => console.error('Combined AI Interview email failed:', err));
+        });
+        console.log('Combined AI interview email sent successfully to:', email);
+      } catch (err) {
+        console.error('Combined AI Interview email failed:', err.message);
       }
-    }).catch(err => console.error('User lookup for email failed:', err));
+    };
+
+    // Fire-and-forget — never blocks the response
+    sendEmail();
 
     res.json({ message: 'Session saved', sessionId: session._id });
   } catch (error) {

@@ -15,38 +15,78 @@ export default function BulkScreening() {
   const [expandedRows, setExpandedRows] = useState({});
   const [sortBy, setSortBy] = useState('score');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [showShortlistedOnly, setShowShortlistedOnly] = useState(false);
 
-  // Check admin role
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  if (user.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  const handleDrop = (e) => {
+  const handleDrop = async (e) => {
     e.preventDefault();
     setDragOver(false);
-    const droppedFiles = Array.from(e.dataTransfer.files).filter(
-      (file) => file.type === 'application/pdf'
-    );
-    if (droppedFiles.length > 0) {
+
+    const items = e.dataTransfer.items;
+    if (!items) {
+      const droppedFiles = Array.from(e.dataTransfer.files).filter(
+        (file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+      );
+      if (droppedFiles.length > 0) {
+        setFiles((prev) => {
+          const combined = [...prev, ...droppedFiles];
+          return combined.slice(0, 1000);
+        });
+        setError('');
+      } else {
+        setError('Only PDF files are allowed!');
+      }
+      return;
+    }
+
+    const fileList = [];
+    const traverseEntry = async (entry) => {
+      if (entry.isFile) {
+        if (entry.name.toLowerCase().endsWith('.pdf')) {
+          const file = await new Promise((resolve) => entry.file(resolve));
+          fileList.push(file);
+        }
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const readEntries = () => new Promise((resolve) => reader.readEntries(resolve));
+        let entries = await readEntries();
+        while (entries.length > 0) {
+          for (const childEntry of entries) {
+            await traverseEntry(childEntry);
+          }
+          entries = await readEntries();
+        }
+      }
+    };
+
+    const traversePromises = [];
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].webkitGetAsEntry();
+      if (entry) {
+        traversePromises.push(traverseEntry(entry));
+      }
+    }
+
+    await Promise.all(traversePromises);
+
+    if (fileList.length > 0) {
       setFiles((prev) => {
-        const combined = [...prev, ...droppedFiles];
-        return combined.slice(0, 30);
+        const combined = [...prev, ...fileList];
+        return combined.slice(0, 1000);
       });
       setError('');
     } else {
-      setError('Only PDF files are allowed!');
+      setError('No PDF files found in the dropped items!');
     }
   };
 
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files).filter(
-      (file) => file.type === 'application/pdf'
+      (file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
     );
     if (selected.length > 0) {
       setFiles((prev) => {
         const combined = [...prev, ...selected];
-        return combined.slice(0, 30);
+        return combined.slice(0, 1000);
       });
       setError('');
     } else {
@@ -101,6 +141,42 @@ export default function BulkScreening() {
     return 'Needs Work';
   };
 
+  const handleExportCSV = () => {
+    if (!results || results.length === 0) return;
+    const targetResults = results.filter(
+      (r) => !showShortlistedOnly || shortlisted[r.fileName]
+    );
+    if (targetResults.length === 0) {
+      alert("No candidates to export.");
+      return;
+    }
+    const headers = ["Candidate Name / Filename", "ATS Match Score", "Matched Skills", "Missing Skills", "Status", "Shortlisted"];
+    const rows = targetResults.map((r) => {
+      const matchScore = r.error ? "Failed" : `${r.atsScore}%`;
+      const matched = r.error ? "" : (r.matchedSkills || []).join("; ");
+      const missing = r.error ? "" : (r.missingSkills || []).join("; ");
+      const status = r.error ? "Failed" : getScoreLabel(r.atsScore);
+      const isStarred = shortlisted[r.fileName] ? "Yes" : "No";
+      return [
+        `"${r.fileName.replace(/"/g, '""')}"`,
+        `"${matchScore}"`,
+        `"${matched.replace(/"/g, '""')}"`,
+        `"${missing.replace(/"/g, '""')}"`,
+        `"${status}"`,
+        `"${isStarred}"`
+      ];
+    });
+    const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `SmartHire_Screening_Report_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Compute stats
   const validResults = results ? results.filter((r) => !r.error) : [];
   const avgScore = validResults.length
@@ -108,22 +184,24 @@ export default function BulkScreening() {
     : 0;
   const topScore = validResults.length ? Math.max(...validResults.map((r) => r.atsScore)) : 0;
 
-  // Sorting
-  const sortedResults = results
-    ? [...results].sort((a, b) => {
-        if (a.error && !b.error) return 1;
-        if (!a.error && b.error) return -1;
-        if (a.error && b.error) return a.fileName.localeCompare(b.fileName);
-
-        if (sortBy === 'score') {
-          return sortOrder === 'desc' ? b.atsScore - a.atsScore : a.atsScore - b.atsScore;
-        } else {
-          return sortOrder === 'desc'
-            ? b.fileName.localeCompare(a.fileName)
-            : a.fileName.localeCompare(b.fileName);
-        }
-      })
+  // Filter and Sort
+  const filteredResults = results
+    ? results.filter((r) => !showShortlistedOnly || shortlisted[r.fileName])
     : [];
+
+  const sortedResults = filteredResults.sort((a, b) => {
+    if (a.error && !b.error) return 1;
+    if (!a.error && b.error) return -1;
+    if (a.error && b.error) return a.fileName.localeCompare(b.fileName);
+
+    if (sortBy === 'score') {
+      return sortOrder === 'desc' ? b.atsScore - a.atsScore : a.atsScore - b.atsScore;
+    } else {
+      return sortOrder === 'desc'
+        ? b.fileName.localeCompare(a.fileName)
+        : a.fileName.localeCompare(b.fileName);
+    }
+  });
 
   const cardCls =
     'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl transition-all duration-200';
@@ -133,7 +211,7 @@ export default function BulkScreening() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 px-4 sm:px-6 py-8 transition-colors duration-300">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-[1600px] mx-auto">
         {/* Title Section */}
         <div className="mb-8">
           <h1
@@ -188,7 +266,7 @@ export default function BulkScreening() {
               className="text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2 block"
               style={{ fontFamily: 'Inter, sans-serif' }}
             >
-              Upload Resumes (PDF, up to 30 files)
+              Upload Resumes (PDF, up to 1000 files)
             </label>
             <div
               onDragOver={(e) => {
@@ -197,16 +275,15 @@ export default function BulkScreening() {
               }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
-              onClick={() => document.getElementById('bulkResumeInput').click()}
-              className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all h-[126px] flex flex-col justify-center items-center"
+              className="border-2 border-dashed rounded-xl p-6 text-center transition-all h-[140px] flex flex-col justify-center items-center gap-2"
               style={{
                 borderColor: dragOver ? '#3b82f6' : files.length > 0 ? '#22c55e' : isDark ? '#374151' : '#e5e7eb',
                 backgroundColor: dragOver ? (isDark ? '#1e3a5f20' : '#eff6ff') : 'transparent'
               }}
             >
-              <div className="text-3xl mb-1">{files.length > 0 ? '📚' : '📄'}</div>
+              <div className="text-3xl">{files.length > 0 ? '📚' : '📄'}</div>
               {files.length > 0 ? (
-                <>
+                <div>
                   <p
                     style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600 }}
                     className="text-green-500 text-sm"
@@ -214,33 +291,54 @@ export default function BulkScreening() {
                     {files.length} resume(s) selected
                   </p>
                   <p
-                    style={{ fontFamily: 'Inter, sans-serif', fontSize: 12 }}
+                    style={{ fontFamily: 'Inter, sans-serif', fontSize: 11 }}
                     className="text-gray-500 dark:text-gray-400 mt-0.5"
                   >
-                    Click or drop to add more PDF files · Max 30
+                    Add more: 
+                    <button onClick={() => document.getElementById('bulkResumeInput').click()} className="text-blue-500 hover:underline mx-1 font-semibold">Files</button> or
+                    <button onClick={() => document.getElementById('bulkFolderInput').click()} className="text-blue-500 hover:underline mx-1 font-semibold">Folder</button>
                   </p>
-                </>
+                </div>
               ) : (
-                <>
+                <div>
                   <p
-                    style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13.5 }}
-                    className="text-gray-700 dark:text-gray-300"
+                    style={{ fontFamily: 'Inter, sans-serif', fontWeight: 550, fontSize: 13.5 }}
+                    className="text-gray-700 dark:text-gray-300 mb-1"
                   >
-                    Drop your PDF resumes here
+                    Drop your PDF resumes or folder here
                   </p>
-                  <p
-                    style={{ fontFamily: 'Inter, sans-serif', fontSize: 12 }}
-                    className="text-gray-400 dark:text-gray-500 mt-0.5"
-                  >
-                    or click to browse · Max 30 files (5MB each)
-                  </p>
-                </>
+                  <div className="flex gap-2 justify-center mt-1">
+                    <button
+                      onClick={() => document.getElementById('bulkResumeInput').click()}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors"
+                      style={{ fontFamily: 'Inter, sans-serif' }}
+                    >
+                      📁 Choose Files
+                    </button>
+                    <button
+                      onClick={() => document.getElementById('bulkFolderInput').click()}
+                      className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors"
+                      style={{ fontFamily: 'Inter, sans-serif' }}
+                    >
+                      📂 Choose Folder
+                    </button>
+                  </div>
+                </div>
               )}
               <input
                 id="bulkResumeInput"
                 type="file"
                 multiple
                 accept=".pdf"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <input
+                id="bulkFolderInput"
+                type="file"
+                multiple
+                webkitdirectory=""
+                directory=""
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -255,7 +353,7 @@ export default function BulkScreening() {
               style={{ fontFamily: 'Sora, sans-serif', fontSize: 14, fontWeight: 600 }}
               className="text-gray-900 dark:text-white mb-2"
             >
-              Selected Resumes ({files.length}/30)
+              Selected Resumes ({files.length}/1000)
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
               {files.map((file, i) => (
@@ -379,14 +477,36 @@ export default function BulkScreening() {
             </div>
 
             {/* Header and Sorting */}
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
               <h3
                 style={{ fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 600 }}
                 className="text-gray-900 dark:text-white"
               >
                 Ranked Candidates
               </h3>
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                {/* Shortlisted filter */}
+                <label className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300 cursor-pointer font-medium select-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  <input
+                    type="checkbox"
+                    checked={showShortlistedOnly}
+                    onChange={(e) => setShowShortlistedOnly(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 dark:bg-gray-800"
+                  />
+                  <span>⭐ Shortlisted Only</span>
+                </label>
+
+                {/* Export button */}
+                <button
+                  onClick={handleExportCSV}
+                  className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all shadow-sm shadow-green-600/20"
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  📥 Export CSV
+                </button>
+
+                <div className="h-4 w-px bg-gray-200 dark:bg-gray-700"></div>
+
                 <span
                   className="text-gray-500 dark:text-gray-400"
                   style={{ fontFamily: 'Inter, sans-serif' }}

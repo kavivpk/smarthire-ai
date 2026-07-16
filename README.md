@@ -23,15 +23,8 @@ SmartHire AI is an advanced, AI-powered placement preparation platform designed 
    - **Live Code Editor**: Real-time collaborative coding environment.
    - **Screen Sharing**: Effortless sharing for system design and presentations.
    - **Admin Controls**: Interviewers can push questions to candidates and submit manual evaluation scores.
-
-5. **ML Placement Prediction** 📊
-   - Uses historical data and your performance metrics (ATS score, mock interview results).
-   - Machine learning algorithms predict your placement probability and provide actionable insights.
-
-6. **Personalized Career Roadmap** 🗺️
-   - Generates an 8-week structured learning timeline based on your target role and current skill gaps.
-
-7. **Admin Dashboard** 👑
+   
+5. **Admin Dashboard** 👑
    - **Analytics**: Track student progress, total interviews, and average scores.
    - **Dynamic Question Management**: Easily upload new aptitude questions to the database which will automatically rotate into student exams.
    - **Secure Access**: Admin registration is protected by a secret key to prevent unauthorized access.
@@ -106,7 +99,7 @@ npm run dev
 cd ai-service
 venv\Scripts\activate
 uvicorn main:app --reload --port 8000
-```
+``` 
 
 **Frontend:**
 ```powershell

@@ -36,6 +36,37 @@ export default function ProctoringGuard({
   const [cameraPreviewVisible, setCameraPreviewVisible] = useState(true);
   const previewVideoRef = useRef(null);
 
+  // Dragging state for camera thumbnail
+  const [camPos, setCamPos] = useState({ x: window.innerWidth - 160, y: window.innerHeight - 125 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, startCamX: 0, startCamY: 0 });
+
+  const handlePointerDown = (e) => {
+    setIsDragging(true);
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      startCamX: camPos.x,
+      startCamY: camPos.y,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setCamPos({
+      x: dragStart.current.startCamX + dx,
+      y: dragStart.current.startCamY + dy,
+    });
+  };
+
+  const handlePointerUp = (e) => {
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
   const handleDisqualified = useCallback((info) => {
     setPhase('disqualified');
     if (typeof onDisqualified === 'function') onDisqualified(info);
@@ -346,25 +377,36 @@ export default function ProctoringGuard({
           </div>
         )}
         {showCameraThumbnail && proctoring.stream && cameraPreviewVisible && (
-          <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9980,
-            width: 140, height: 105, borderRadius: 12, overflow: 'hidden',
-            border: proctoring.faceAbsent ? '2px solid #ef4444' : '2px solid rgba(99,102,241,0.6)',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.5)', cursor: 'pointer',
-            transition: 'border-color 0.3s' }}
-            title="Click to hide/show camera preview"
-            onClick={() => setCameraPreviewVisible(false)}>
+          <div 
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            style={{ 
+              position: 'fixed', left: camPos.x, top: camPos.y, zIndex: 9980,
+              width: 140, height: 105, borderRadius: 12, overflow: 'hidden',
+              border: proctoring.faceAbsent ? '2px solid #ef4444' : '2px solid rgba(99,102,241,0.6)',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.5)', cursor: isDragging ? 'grabbing' : 'grab',
+              transition: isDragging ? 'none' : 'border-color 0.3s' 
+            }}
+            title="Drag to move">
             <video ref={previewVideoRef} autoPlay playsInline muted
               style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
             {proctoring.faceAbsent && (
               <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, textAlign: 'center',
                 fontFamily: 'Inter, sans-serif', fontSize: 10, fontWeight: 600,
-                color: '#ef4444', background: 'rgba(0,0,0,0.7)', padding: '2px 0' }}>
+                color: '#ef4444', background: 'rgba(0,0,0,0.7)', padding: '2px 0', pointerEvents: 'none' }}>
                 Face not detected
               </div>
             )}
-            <div style={{ position: 'absolute', top: 4, left: 6, fontFamily: 'Inter, sans-serif',
-              fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
-              👁 Monitored · ×close
+            <div style={{ position: 'absolute', top: 4, left: 6, right: 6, display: 'flex', justifyContent: 'space-between',
+              fontFamily: 'Inter, sans-serif', fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
+              <span style={{ pointerEvents: 'none' }}>👁 Monitored</span>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setCameraPreviewVisible(false); }}
+                style={{ background: 'rgba(0,0,0,0.5)', border: 'none', color: '#fff', borderRadius: 4, cursor: 'pointer', padding: '1px 4px' }}
+                title="Hide camera">
+                × close
+              </button>
             </div>
           </div>
         )}
@@ -427,16 +469,18 @@ export default function ProctoringGuard({
       {/* Camera thumbnail */}
       {showCameraThumbnail && proctoring.stream && cameraPreviewVisible && (
         <div
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
           style={{
-            position: 'fixed', bottom: 20, right: 20, zIndex: 9980,
+            position: 'fixed', left: camPos.x, top: camPos.y, zIndex: 9980,
             width: 140, height: 105, borderRadius: 12, overflow: 'hidden',
             border: proctoring.faceAbsent ? '2px solid #ef4444' : '2px solid rgba(99,102,241,0.6)',
             boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-            cursor: 'pointer',
-            transition: 'border-color 0.3s',
+            cursor: isDragging ? 'grabbing' : 'grab',
+            transition: isDragging ? 'none' : 'border-color 0.3s',
           }}
-          title="Click to hide/show camera preview"
-          onClick={() => setCameraPreviewVisible(false)}
+          title="Drag to move"
         >
           <video
             ref={previewVideoRef}
@@ -449,17 +493,23 @@ export default function ProctoringGuard({
             <div style={{
               position: 'absolute', bottom: 4, left: 0, right: 0, textAlign: 'center',
               fontFamily: 'Inter, sans-serif', fontSize: 10, fontWeight: 600,
-              color: '#ef4444', background: 'rgba(0,0,0,0.7)', padding: '2px 0'
+              color: '#ef4444', background: 'rgba(0,0,0,0.7)', padding: '2px 0', pointerEvents: 'none'
             }}>
               Face not detected
             </div>
           )}
           <div style={{
-            position: 'absolute', top: 4, left: 6,
+            position: 'absolute', top: 4, left: 6, right: 6, display: 'flex', justifyContent: 'space-between',
             fontFamily: 'Inter, sans-serif', fontSize: 9, fontWeight: 600,
             color: 'rgba(255,255,255,0.7)',
           }}>
-            👁 Monitored · ×close
+            <span style={{ pointerEvents: 'none' }}>👁 Monitored</span>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setCameraPreviewVisible(false); }}
+              style={{ background: 'rgba(0,0,0,0.5)', border: 'none', color: '#fff', borderRadius: 4, cursor: 'pointer', padding: '1px 4px' }}
+              title="Hide camera">
+              × close
+            </button>
           </div>
         </div>
       )}

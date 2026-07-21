@@ -12,6 +12,15 @@ export function useProctoring({ onDisqualified, active = false, existingStream =
   // otherwise start with null and wait for requestMediaPermissions.
   const [stream, setStream] = useState(existingStream);
   const [screenStream, setScreenStream] = useState(null);
+
+  // Sync existingStream if it changes (e.g. late assignment)
+  useEffect(() => {
+    if (existingStream) {
+      setStream(existingStream);
+      setPermissionGranted(true);
+    }
+  }, [existingStream]);
+
   const [permissionGranted, setPermissionGranted] = useState(existingStream != null);
   const [permissionError, setPermissionError] = useState('');
   const [violations, setViolations] = useState(0);

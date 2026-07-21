@@ -10,6 +10,8 @@ const {
   evaluateCode,
   getCodingProblems,
   saveInterviewSession,
+  sendAptitudeEmail,
+  sendCodingEmail,
 } = require('../controllers/interviewController');
 const {
   evaluateInterviewAnswer,
@@ -34,6 +36,8 @@ router.post('/evaluate/complete', protect, completeTechnicalInterview);
 router.get('/technical-stats', protect, getTechnicalInterviewStats);
 router.get('/coding-stats', protect, getCodingStats);
 router.post('/session/save', protect, saveInterviewSession);
+router.post('/aptitude/email', protect, sendAptitudeEmail);
+router.post('/coding/email', protect, sendCodingEmail);
 
 // Test combined email — call this to verify email is working
 router.post('/test-combined-email', protect, async (req, res) => {

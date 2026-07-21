@@ -1,4 +1,4 @@
-﻿const nodemailer = require('nodemailer');
+const nodemailer = require('nodemailer');
 
 const createTransporter = () => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -404,6 +404,8 @@ module.exports = {
   sendHRInterviewReport,
   sendPlacementRecommendationReport,
   sendCombinedAIInterviewResult,
+  sendAptitudeOnlyResult,
+  sendCodingOnlyResult,
 };
 
 async function sendCodingReport(toEmail, studentName, reportData) {
@@ -741,3 +743,108 @@ async function sendPlacementRecommendationReport(toEmail, studentName, reportDat
   return transporter.sendMail(mailOptions);
 }
 
+
+/**
+ * sendAptitudeOnlyResult - sent immediately after Aptitude section completion
+ */
+async function sendAptitudeOnlyResult(toEmail, studentName, data) {
+  const transporter = createTransporter();
+  const { correct = 0, total = 0, categoryScores = {} } = data;
+  const percent = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const catRows = Object.entries(categoryScores).map(([cat, s]) =>
+    `<tr>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#374151;">${cat}</td>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#2563eb;">${s.correct} / ${s.total}</td>
+    </tr>`
+  ).join('');
+
+  const mailOptions = {
+    from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
+    to: toEmail,
+    subject: 'AI Interview - Aptitude Section Result',
+    html: `<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0;}
+      .wrap{max-width:580px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);}
+      .hdr{background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:28px 32px;color:#fff;}
+      .body{padding:28px 32px;}
+      .overall{background:linear-gradient(135deg,#4f46e5,#7c3aed);border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;}
+      .ov-label{color:#c7d2fe;font-size:12px;letter-spacing:.5px;text-transform:uppercase;}
+      .ov-val{font-size:36px;font-weight:800;color:#fff;margin-top:4px;}
+      table{width:100%;border-collapse:collapse;font-size:13px;}
+      .ftr{background:#f9fafb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;}
+    </style></head><body>
+    <div class="wrap">
+      <div class="hdr">
+        <div style="font-size:22px;font-weight:bold;margin-bottom:4px;">SmartHire AI</div>
+        <div style="color:#c7d2fe;font-size:13px;">Aptitude Section - Result Report</div>
+      </div>
+      <div class="body">
+        <p style="color:#374151;font-size:16px;font-weight:600;margin-bottom:4px;">Hello, ${studentName || 'Candidate'}!</p>
+        <p style="color:#6b7280;font-size:14px;margin-bottom:20px;">You have completed the <strong>Aptitude</strong> section. Here is your score breakdown.</p>
+        <div class="overall">
+          <div class="ov-label">Aptitude Score</div>
+          <div class="ov-val">${correct} / ${total} (${percent}%)</div>
+        </div>
+        <table><thead><tr>
+          <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;color:#6b7280;font-size:12px;">Category</th>
+          <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;color:#6b7280;font-size:12px;">Score</th>
+        </tr></thead><tbody>${catRows}<tr style="font-weight:700;color:#1d4ed8;"><td style="padding:8px;border-top:2px solid #e5e7eb;">Total</td><td style="padding:8px;border-top:2px solid #e5e7eb;">${correct} / ${total}</td></tr></tbody></table>
+      </div>
+      <div class="ftr">SmartHire AI - AI-Powered Hiring Intelligence</div>
+    </div></body></html>`,
+  };
+  return transporter.sendMail(mailOptions);
+}
+
+/**
+ * sendCodingOnlyResult - sent immediately after Coding section completion
+ */
+async function sendCodingOnlyResult(toEmail, studentName, data) {
+  const transporter = createTransporter();
+  const { results = [], avgScore = 0, solved = 0 } = data;
+  const total = results.length;
+  const problemRows = results.map((r, i) =>
+    `<tr>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#374151;">Problem ${i + 1}: ${r.title || ''}</td>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600;">${r.score || 0} / 10</td>
+    </tr>`
+  ).join('');
+  const totalScore = results.reduce((s, r) => s + (r.score || 0), 0);
+
+  const mailOptions = {
+    from: `"SmartHire AI" <${process.env.EMAIL_USER}>`,
+    to: toEmail,
+    subject: 'AI Interview - Coding Section Result',
+    html: `<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0;}
+      .wrap{max-width:580px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);}
+      .hdr{background:linear-gradient(135deg,#d97706,#f59e0b);padding:28px 32px;color:#fff;}
+      .body{padding:28px 32px;}
+      .overall{background:linear-gradient(135deg,#d97706,#f59e0b);border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;}
+      .ov-label{color:#fef3c7;font-size:12px;letter-spacing:.5px;text-transform:uppercase;}
+      .ov-val{font-size:36px;font-weight:800;color:#fff;margin-top:4px;}
+      table{width:100%;border-collapse:collapse;font-size:13px;}
+      .ftr{background:#f9fafb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;}
+    </style></head><body>
+    <div class="wrap">
+      <div class="hdr">
+        <div style="font-size:22px;font-weight:bold;margin-bottom:4px;">SmartHire AI</div>
+        <div style="color:#fef3c7;font-size:13px;">Coding Section - Result Report</div>
+      </div>
+      <div class="body">
+        <p style="color:#374151;font-size:16px;font-weight:600;margin-bottom:4px;">Hello, ${studentName || 'Candidate'}!</p>
+        <p style="color:#6b7280;font-size:14px;margin-bottom:20px;">You have completed the <strong>Coding</strong> section. Here is your score breakdown.</p>
+        <div class="overall">
+          <div class="ov-label">Coding Score</div>
+          <div class="ov-val">${solved} / ${total} solved</div>
+        </div>
+        <table><thead><tr>
+          <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;color:#6b7280;font-size:12px;">Problem</th>
+          <th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;color:#6b7280;font-size:12px;">Score</th>
+        </tr></thead><tbody>${problemRows}<tr style="font-weight:700;color:#b45309;"><td style="padding:8px;border-top:2px solid #e5e7eb;">Total</td><td style="padding:8px;border-top:2px solid #e5e7eb;">${totalScore} / ${total * 10}</td></tr></tbody></table>
+      </div>
+      <div class="ftr">SmartHire AI - AI-Powered Hiring Intelligence</div>
+    </div></body></html>`,
+  };
+  return transporter.sendMail(mailOptions);
+}

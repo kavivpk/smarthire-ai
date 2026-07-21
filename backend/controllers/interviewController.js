@@ -3,7 +3,7 @@ const User = require('../models/User');
 const AptitudeQuestion = require('../models/AptitudeQuestion');
 const CodingReport = require('../models/CodingReport');
 const InterviewSession = require('../models/InterviewSession');
-const { sendAptitudeResult, sendCodingReport, sendCombinedAIInterviewResult } = require('../utils/emailService');
+const { sendAptitudeResult, sendCodingReport, sendCombinedAIInterviewResult, sendAptitudeOnlyResult, sendCodingOnlyResult } = require('../utils/emailService');
 const { notify } = require('../services/notificationService');
 
 // Skill-based question bank
@@ -742,4 +742,37 @@ const saveInterviewSession = async (req, res) => {
   }
 };
 
-module.exports = { getQuestions, getQuestionsFromSkills, submitInterview, getHistory, generateAptitude, submitAptitude, evaluateCode, getCodingProblems, saveInterviewSession };
+const sendAptitudeEmail = async (req, res) => {
+  try {
+    const { aptitudeResult } = req.body;
+    const user = await User.findById(req.user.id).select('email name');
+    const email = user?.email || req.user.email;
+    const name  = user?.name  || req.user.name;
+    if (!email) return res.status(400).json({ message: 'No email found for user' });
+    // fire-and-forget
+    sendAptitudeOnlyResult(email, name, aptitudeResult || {}).catch(err =>
+      console.error('sendAptitudeOnlyResult failed:', err.message)
+    );
+    res.json({ message: 'Aptitude email queued' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const sendCodingEmail = async (req, res) => {
+  try {
+    const { codingResult } = req.body;
+    const user = await User.findById(req.user.id).select('email name');
+    const email = user?.email || req.user.email;
+    const name  = user?.name  || req.user.name;
+    if (!email) return res.status(400).json({ message: 'No email found for user' });
+    sendCodingOnlyResult(email, name, codingResult || {}).catch(err =>
+      console.error('sendCodingOnlyResult failed:', err.message)
+    );
+    res.json({ message: 'Coding email queued' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+module.exports = { getQuestions, getQuestionsFromSkills, submitInterview, getHistory, generateAptitude, submitAptitude, evaluateCode, getCodingProblems, saveInterviewSession, sendAptitudeEmail, sendCodingEmail };

@@ -98,61 +98,53 @@ export default function MockInterview() {
     }
   };
 
-  const evaluateCurrentAnswer = async () => {
+  const goToNextQuestion = async () => {
     if (!currentAnswer.trim()) return;
-
-    setLoading(true);
-    setEvaluationError('');
-    try {
-      const activeQuestion = questions[currentQ];
-      const res = await API.post('/interview/evaluate', {
-        question: activeQuestion.question,
-        answer: currentAnswer,
-        resume: resumeSkills.join(', '),
-        interviewId,
-        keywords: activeQuestion.keywords || questionData[currentQ]?.keywords || []
-      });
-
-      setCurrentEvaluation(res.data);
-    } catch {
-      setEvaluationError('Evaluation failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const continueAfterEvaluation = () => {
-    if (!currentEvaluation) return;
 
     const answerRecord = {
       questionId: currentQ,
       question: questions[currentQ].question,
       answer: currentAnswer,
-      evaluation: currentEvaluation
     };
 
     const newAnswers = [...answers, answerRecord];
-    const newEvaluatedAnswers = [...evaluatedAnswers, answerRecord];
     setAnswers(newAnswers);
-    setEvaluatedAnswers(newEvaluatedAnswers);
     setCurrentAnswer('');
-    setCurrentEvaluation(null);
     setEvaluationError('');
 
     if (currentQ + 1 < questions.length) {
       setCurrentQ(currentQ + 1);
     } else {
-      submitInterview(newAnswers, newEvaluatedAnswers);
+      // All questions answered — now evaluate everything and submit
+      await submitInterview(newAnswers);
     }
   };
 
-  const submitInterview = async (finalAnswers, finalEvaluatedAnswers) => {
+  const submitInterview = async (finalAnswers) => {
     setLoading(true);
     try {
+      // Evaluate all answers at once
+      const evaluatedList = [];
+      for (let i = 0; i < finalAnswers.length; i++) {
+        const a = finalAnswers[i];
+        try {
+          const res = await API.post('/interview/evaluate', {
+            question: a.question,
+            answer: a.answer,
+            resume: resumeSkills.join(', '),
+            interviewId,
+            keywords: questionData[i]?.keywords || []
+          });
+          evaluatedList.push({ ...a, evaluation: res.data });
+        } catch {
+          evaluatedList.push({ ...a, evaluation: null });
+        }
+      }
+
       const [submitRes, completeRes] = await Promise.all([
         API.post('/interview/submit', {
           topic: selectedTopic.id,
-          answers: finalAnswers,
+          answers: evaluatedList,
           questions: questionData
         }),
         API.post('/interview/evaluate/complete', { interviewId })
@@ -162,7 +154,7 @@ export default function MockInterview() {
         ...submitRes.data,
         technicalSummary: completeRes.data.summary,
         technicalReports: completeRes.data.reports,
-        evaluatedAnswers: finalEvaluatedAnswers
+        evaluatedAnswers: evaluatedList
       });
       setStage('result');
     } catch {
@@ -423,53 +415,28 @@ export default function MockInterview() {
             </div>
           )}
 
-          {currentEvaluation && (
-            <div className="bg-white dark:bg-gray-900 border border-purple-500/30 rounded-2xl p-6 mb-4"
-              style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(168,85,247,0.2)' }}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 style={{ fontFamily:'Sora, sans-serif', fontWeight:600, fontSize:15 }}
-                  className="text-gray-900 dark:text-white">
-                  AI Evaluation
-                </h3>
-                <span style={{ fontFamily:'JetBrains Mono, monospace', fontSize:18, fontWeight:700, color: getScoreColor(currentEvaluation.overallScore) }}>
-                  {currentEvaluation.overallScore}/10
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
-                {[
-                  ['Technical', currentEvaluation.technicalScore],
-                  ['Communication', currentEvaluation.communicationScore],
-                  ['Grammar', currentEvaluation.grammarScore],
-                  ['Confidence', currentEvaluation.confidenceScore],
-                  ['Keyword', currentEvaluation.keywordScore],
-                ].map(([label, score]) => (
-                  <div key={label} className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-                    <p style={{ fontFamily:'Inter, sans-serif', fontSize:12 }} className="text-gray-500 dark:text-gray-400 mb-1">{label}</p>
-                    <p style={{ fontFamily:'JetBrains Mono, monospace', fontSize:14, fontWeight:700, color: getScoreColor(score) }}>{score}/10</p>
-                  </div>
+          {/* Evaluating loader shown only on last question submit */}
+          {loading && (
+            <div className="mb-4 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
+              <div className="flex justify-center gap-1.5 mb-2">
+                {[0,1,2].map(i => (
+                  <div key={i} className="w-2 h-2 rounded-full bg-purple-400 animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s` }} />
                 ))}
               </div>
-
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-700 dark:text-gray-300">{currentEvaluation.feedback}</p>
-                <p className="text-gray-500 dark:text-gray-400">
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Recommendation:</span> {currentEvaluation.recommendation}
-                </p>
-              </div>
+              <p className="text-purple-400 text-sm font-medium">Evaluating all your answers...</p>
+              <p className="text-purple-300 text-xs mt-1">Please wait, this takes a few seconds</p>
             </div>
           )}
 
           <button
-            onClick={currentEvaluation ? continueAfterEvaluation : evaluateCurrentAnswer}
+            onClick={goToNextQuestion}
             disabled={!currentAnswer.trim() || loading}
             className="w-full py-3 rounded-xl font-medium text-white transition-colors disabled:opacity-40"
             style={{ backgroundColor: '#a855f7' }}
           >
-            {loading ? 'Evaluating...' :
-              currentEvaluation
-                ? (currentQ + 1 === questions.length ? 'Finish Interview' : 'Continue to Next Question')
-                : 'Submit Answer'}
+            {loading ? 'Evaluating all answers...' :
+              currentQ + 1 === questions.length ? 'Submit & See Results' : 'Next Question'}
           </button>
         </div>
       )}

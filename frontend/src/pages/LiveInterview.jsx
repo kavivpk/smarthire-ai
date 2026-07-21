@@ -54,6 +54,7 @@ export default function LiveInterview() {
   const [sessionViolations, setSessionViolations] = useState(0);
   const [sessionDisqualified, setSessionDisqualified] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [sectionPhase, setSectionPhase] = useState('instructions'); // 'instructions' | 'active' | 'result'
   const [aiSessionStream, setAiSessionStream] = useState(null); // camera stream from ProctoringGuard session
   const [aiCodingResult, setAiCodingResult] = useState(null); // { solved, total, avgScore, results }
   const [techResult, setTechResult] = useState(null); // { overallScore, totalScore }
@@ -70,7 +71,7 @@ export default function LiveInterview() {
   const [role, setRole] = useState('student');
   const [participants, setParticipants] = useState([]);
   const [isRoomCreator, setIsRoomCreator] = useState(false);
-  const [copyText, setCopyText] = useState('📋 Copy Room ID');
+  const [copyText, setCopyText] = useState(' Copy Room ID');
   const [showModal, setShowModal] = useState(false);
 
   // chat
@@ -496,6 +497,14 @@ export default function LiveInterview() {
     }
   }, [sessionStarted, stage, aiSessionStage]);
 
+  // When technical stage begins, auto-start the tech interview if resume is ready
+  useEffect(() => {
+    if (stage === 'ai_interview' && sessionStarted && aiSessionStage === 'technical' && resumeFile && !resumeAnalyzing && !socket) {
+      startAiTechInterview();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionStarted, stage, aiSessionStage]);
+
   // ══════════════════════════════════════════════════════════════════════════
   // SOCKET / ADMIN INTERVIEW FLOW
   // ══════════════════════════════════════════════════════════════════════════
@@ -662,8 +671,8 @@ export default function LiveInterview() {
 
   const handleCopyRoomId = () => {
     navigator.clipboard.writeText(roomId);
-    setCopyText('✅ Copied!');
-    setTimeout(() => setCopyText('📋 Copy Room ID'), 2000);
+    setCopyText(' Copied!');
+    setTimeout(() => setCopyText(' Copy Room ID'), 2000);
   };
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -707,20 +716,29 @@ export default function LiveInterview() {
     }
   }, []);
 
-  const onAptitudeComplete = useCallback((result) => {
+  const onAptitudeComplete = useCallback(async (result) => {
     setAptResult(result);
-    // Advance to coding section
-    setAiSessionStage('coding');
+    setSectionPhase('result');
+    try {
+      await API.post('/interview/aptitude/email', { aptitudeResult: result });
+    } catch (err) {
+      console.error('Failed to send aptitude email', err);
+    }
   }, []);
 
-  const onCodingComplete = useCallback((results) => {
+  const onCodingComplete = useCallback(async (results) => {
     const solved   = results.filter(r => (r.score || 0) >= 5).length;
     const avgScore = results.length
       ? Math.round(results.reduce((s, r) => s + (r.score || 0), 0) / results.length * 10) / 10
       : 0;
-    setAiCodingResult({ solved, total: results.length, avgScore, results });
-    // Advance to technical Q&A section
-    setAiSessionStage('technical');
+    const codingRes = { solved, total: results.length, avgScore, results };
+    setAiCodingResult(codingRes);
+    setSectionPhase('result');
+    try {
+      await API.post('/interview/coding/email', { codingResult: codingRes });
+    } catch (err) {
+      console.error('Failed to send coding email', err);
+    }
   }, []);
 
   const handleAIDisqualified = useCallback(async ({ violations, reason }) => {
@@ -799,8 +817,8 @@ export default function LiveInterview() {
         {/* Mode picker */}
         <div className="grid md:grid-cols-2 gap-4">
           {[
-            { id: 'ai', icon: '🤖', title: 'AI Interview', desc: 'Self-practice with AI evaluation', badge: 'No interviewer needed' },
-            { id: 'admin', icon: '🎙️', title: 'HR Live Interview', desc: 'Real-time with recruiter/HR', badge: 'WebRTC + AI monitoring' },
+            { id: 'ai', icon: '', title: 'AI Interview', desc: 'Self-practice with AI evaluation', badge: 'No interviewer needed' },
+            { id: 'admin', icon: '️', title: 'HR Live Interview', desc: 'Real-time with recruiter/HR', badge: 'WebRTC + AI monitoring' },
           ].map(m => (
             <button key={m.id} id={`mode-${m.id}`} onClick={() => setMainMode(m.id)}
               className="relative p-6 rounded-2xl border-2 text-left transition-all"
@@ -827,9 +845,9 @@ export default function LiveInterview() {
               <h3 className="text-gray-700 dark:text-gray-300 font-semibold text-base mb-3">Choose Interview Type</h3>
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { id: 'aptitude', icon: '🧠', label: 'Aptitude', desc: '20 MCQ questions', color: '#6366f1' },
-                  { id: 'coding',   icon: '💻', label: 'Coding',   desc: 'Multi-language editor', color: '#f59e0b' },
-                  { id: 'qa',       icon: '🗣️', label: 'Tech Q&A', desc: 'Resume-based questions', color: '#10b981' },
+                  { id: 'aptitude', icon: '', label: 'Aptitude', desc: '20 MCQ questions', color: '#6366f1' },
+                  { id: 'coding',   icon: '', label: 'Coding',   desc: 'Multi-language editor', color: '#f59e0b' },
+                  { id: 'qa',       icon: '️', label: 'Tech Q&A', desc: 'Resume-based questions', color: '#10b981' },
                 ].map(sub => (
                   <button
                     key={sub.id}
@@ -879,13 +897,13 @@ export default function LiveInterview() {
                 >
                   {resumeFile ? (
                     <div className="flex flex-col items-center gap-1">
-                      <span className="text-2xl">✅</span>
+                      <span className="text-2xl"></span>
                       <span className="text-green-500 dark:text-green-400 text-sm font-semibold">{resumeFile.name}</span>
                       <span className="text-gray-400 text-xs">Click to change</span>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-1">
-                      <span className="text-2xl text-gray-400">📄</span>
+                      <span className="text-2xl text-gray-400"></span>
                       <span className="text-gray-500 dark:text-gray-400 text-sm">Click to upload your resume (PDF)</span>
                       <span className="text-gray-400 text-xs">Optional — enhances question quality</span>
                     </div>
@@ -909,12 +927,13 @@ export default function LiveInterview() {
                 if (!userName.trim()) { setError('Please enter your name'); return; }
                 setError('');
                 setAiSessionStage(aiSubMode === 'qa' ? 'technical' : aiSubMode);
+                setSectionPhase('instructions');
                 setSessionStarted(false);
                 setStage('ai_interview');
               }}
               className="w-full py-3.5 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all"
               style={{ background: 'linear-gradient(135deg, #6366f1, #ef4444)' }}>
-              {aiSubMode === 'aptitude' ? '🧠 Start Aptitude Test' : aiSubMode === 'coding' ? '💻 Start Coding Round' : '🗣️ Start Technical Interview'}
+              {aiSubMode === 'aptitude' ? ' Start Aptitude Test' : aiSubMode === 'coding' ? ' Start Coding Round' : '️ Start Technical Interview'}
             </button>
           </div>
         )}
@@ -933,8 +952,8 @@ export default function LiveInterview() {
             {/* Role selector */}
             <div className="grid grid-cols-2 gap-3">
               {[
-                { id: 'student', label: '🎓 Student / Candidate', desc: 'You are being interviewed' },
-                { id: 'admin', label: '👔 HR / Interviewer', desc: 'You are conducting the interview' },
+                { id: 'student', label: ' Student / Candidate', desc: 'You are being interviewed' },
+                { id: 'admin', label: ' HR / Interviewer', desc: 'You are conducting the interview' },
               ].map(r => (
                 <button key={r.id} id={`role-${r.id}`} onClick={() => setRole(r.id)}
                   className="p-4 rounded-xl border text-left text-sm transition-all"
@@ -951,7 +970,7 @@ export default function LiveInterview() {
               <button id="btn-create-room" onClick={handleCreateRoom}
                 className="py-3 rounded-xl font-semibold text-white text-sm transition-all"
                 style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
-                🚀 Create Room
+                 Create Room
               </button>
               <div className="flex gap-2">
                 <input id="join-room-input" type="text" value={joinRoomId} onChange={e => setJoinRoomId(e.target.value.toUpperCase())}
@@ -975,9 +994,9 @@ export default function LiveInterview() {
   if (stage === 'ai_interview') {
     // 3-step progress bar
     const steps = [
-      { id: 'aptitude',  label: 'Aptitude',      icon: '🧠' },
-      { id: 'coding',    label: 'Coding',         icon: '💻' },
-      { id: 'technical', label: 'Technical Q&A',  icon: '🗣️' },
+      { id: 'aptitude',  label: 'Aptitude',      icon: '' },
+      { id: 'coding',    label: 'Coding',         icon: '' },
+      { id: 'technical', label: 'Technical Q&A',  icon: '️' },
     ];
     const stageOrder = { aptitude: 0, coding: 1, technical: 2, complete: 3 };
     const currentStepIdx = stageOrder[aiSessionStage] ?? 0;
@@ -998,29 +1017,28 @@ export default function LiveInterview() {
         {sessionViolations > 0 && !sessionDisqualified && (
           <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700,
             color: '#f87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
-            ⚠ {sessionViolations}/3
+             {sessionViolations}/3
           </span>
         )}
       </div>
     );
 
-    // Combined results screen — scores hidden, only email confirmation shown
+    // Combined results screen
     if (aiSessionStage === 'complete' || sessionDisqualified) {
       return (
         <div className="min-h-screen bg-gray-950 p-4 md:p-8 flex items-center justify-center">
           <div className="max-w-lg w-full bg-gray-900 border border-gray-800 rounded-3xl p-8 shadow-2xl text-center space-y-6">
             {sessionDisqualified && (
               <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
-                <p className="text-red-400 font-bold text-base">🚫 Session Disqualified</p>
+                <p className="text-red-400 font-bold text-base"> Session Disqualified</p>
                 <p className="text-red-300 text-sm mt-1">Your session was terminated after {sessionViolations}/3 proctoring violations. Partial scores recorded.</p>
               </div>
             )}
 
-            {/* Envelope animation */}
             <div className="flex justify-center">
               <div className="w-24 h-24 rounded-full flex items-center justify-center text-5xl"
                 style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(16,185,129,0.15))', border: '2px solid rgba(99,102,241,0.3)' }}>
-                📧
+                Email
               </div>
             </div>
 
@@ -1033,7 +1051,6 @@ export default function LiveInterview() {
               </p>
             </div>
 
-            {/* Email sent badge */}
             <div className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl mx-auto"
               style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
@@ -1048,153 +1065,136 @@ export default function LiveInterview() {
 
             <button onClick={resetAll} className="w-full py-3.5 rounded-xl font-semibold text-white transition-all"
               style={{ background: 'linear-gradient(135deg, #6366f1, #ef4444)' }}>
-              🔄 Return to Setup
+               Return to Setup
             </button>
           </div>
         </div>
       );
     }
 
-    // When session is not yet started, or we are in loading state — show ProctoringGuard wrapper
-    // When session is active AND content is ready — fall through to the dedicated render blocks below
-    // (they already handle stage === 'ai_interview' conditions)
-    // ── Technical Q&A Section — standalone page (proctoring already active via overlay) ──
-    if (sessionStarted && aiSessionStage === 'technical') {
+    // --- INSTRUCTIONS PHASE ---
+    if (sectionPhase === 'instructions') {
+      const sectionInfo = aiSessionStage === 'aptitude' ? { title: 'Aptitude Test', icon: 'Test', desc: '20 multiple-choice questions testing logical reasoning.' }
+        : aiSessionStage === 'coding' ? { title: 'Coding Round', icon: 'Code', desc: 'Write and execute code to solve algorithmic challenges.' }
+        : { title: 'Technical Q&A', icon: 'Voice', desc: 'AI-driven voice interview based on your resume.' };
+
       return (
-        <>
-          {/* Proctoring overlay stays active through Tech QA */}
-          <ProctoringGuard
-            testTitle="AI Interview"
-            onSessionStart={() => {}}
-            onDisqualified={handleAIDisqualified}
-            renderAsOverlay={true}
-            existingStream={aiSessionStream}
-          />
-          <div className="min-h-screen bg-gray-950 flex flex-col">
-            {/* Progress bar shows Part 2 active */}
-            <AIProgress />
-
-            {/* Resume upload — shown until file selected */}
-            {!resumeFile && (
-              <div className="flex-1 flex items-center justify-center p-8">
-                <div className="max-w-lg w-full space-y-6">
-                  {/* Section header */}
-                  <div className="text-center">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-4"
-                      style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                      <span className="w-2 h-2 rounded-full" style={{ background: '#10b981' }} />
-                      <span className="text-sm font-semibold" style={{ color: '#34d399' }}>Section 3 of 3</span>
-                    </div>
-                    <h2 className="text-white text-2xl font-bold mb-2" style={{ fontFamily: 'Sora, sans-serif' }}>
-                      🗣️ Technical Q&A
-                    </h2>
-                    <p className="text-gray-400 text-sm">
-                      Upload your resume to generate personalised technical questions based on your skills.
-                    </p>
-                  </div>
-
-                  {/* Upload card */}
-                  <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
-                    <p className="text-gray-300 text-sm font-medium">📄 Your Resume (PDF)</p>
-                    <div
-                      onClick={() => document.getElementById('aiQaResumeUpload').click()}
-                      className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors hover:border-indigo-500/50"
-                      style={{ borderColor: '#374151', background: 'rgba(255,255,255,0.02)' }}>
-                      <div className="text-4xl mb-3">📄</div>
-                      <p className="text-gray-300 text-sm font-medium">Drop your PDF here</p>
-                      <p className="text-gray-600 text-xs mt-1">or click to browse · Max 5MB</p>
-                      <input id="aiQaResumeUpload" type="file" accept=".pdf" className="hidden"
-                        onChange={e => { if (e.target.files[0]) setResumeFile(e.target.files[0]); }} />
-                    </div>
-                    {error && (
-                      <p className="text-red-400 text-sm text-center bg-red-500/10 rounded-lg py-2">{error}</p>
-                    )}
-                  </div>
-
-                  <button onClick={resetAll} className="block mx-auto text-gray-600 text-xs hover:text-gray-400 transition-all">
-                    ← Exit and Back to Setup
-                  </button>
+        <div className="min-h-screen bg-gray-950 p-4 md:p-8 flex items-center justify-center">
+          <div className="max-w-lg w-full bg-gray-900 border border-gray-800 rounded-3xl p-8 shadow-2xl text-center space-y-6">
+            <div className="flex justify-center">
+              <div className="w-24 h-24 rounded-full flex items-center justify-center text-xl font-bold text-indigo-400"
+                style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(16,185,129,0.15))', border: '2px solid rgba(99,102,241,0.3)' }}>
+                {sectionInfo.icon}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-white text-2xl font-bold" style={{ fontFamily: 'Sora, sans-serif' }}>{sectionInfo.title}</h2>
+              <p className="text-gray-400 text-sm leading-relaxed">{sectionInfo.desc}</p>
+            </div>
+            
+            {aiSessionStage === 'technical' && (
+              <div className="bg-gray-800 p-4 rounded-xl text-left border border-gray-700">
+                <p className="text-gray-300 text-sm font-medium mb-2"> Upload Resume (Required for Tech Q&A)</p>
+                <div onClick={() => document.getElementById('aiQaResumeUpload').click()} className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors hover:border-indigo-500/50" style={{ borderColor: resumeFile ? '#10b981' : '#374151', background: resumeFile ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.02)' }}>
+                  {resumeFile ? <p className="text-green-400 text-sm">{resumeFile.name}</p> : <p className="text-gray-400 text-sm">Click to browse (PDF)</p>}
+                  <input id="aiQaResumeUpload" type="file" accept=".pdf" className="hidden" onChange={e => { if (e.target.files[0]) setResumeFile(e.target.files[0]); }} />
                 </div>
               </div>
             )}
-
-            {/* Analysing state — resume uploaded, waiting for questions */}
-            {resumeFile && resumeAnalyzing && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center space-y-4">
-                  <div className="flex justify-center gap-1.5 mb-4">
-                    {[0,1,2,3].map(i => (
-                      <div key={i} className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce"
-                        style={{ animationDelay: `${i * 0.15}s` }} />
-                    ))}
-                  </div>
-                  <p className="text-white text-sm">🔍 Analysing resume, preparing questions...</p>
-                  <p className="text-gray-500 text-xs">{resumeFile.name}</p>
-                </div>
-              </div>
-            )}
-
-            {/* File selected but not yet analysing — show start button */}
-            {resumeFile && !resumeAnalyzing && !socket && (
-              <div className="flex-1 flex items-center justify-center p-8">
-                <div className="max-w-lg w-full space-y-6">
-                  <div className="text-center">
-                    <h2 className="text-white text-2xl font-bold mb-2" style={{ fontFamily: 'Sora, sans-serif' }}>
-                      🗣️ Technical Q&A
-                    </h2>
-                    <p className="text-gray-400 text-sm">Resume ready. Click below to generate your questions.</p>
-                  </div>
-                  <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 flex items-center gap-3">
-                    <span className="text-2xl">✅</span>
-                    <div>
-                      <p className="text-white text-sm font-medium">{resumeFile.name}</p>
-                      <p className="text-gray-500 text-xs">{(resumeFile.size / 1024).toFixed(0)} KB</p>
-                    </div>
-                    <button onClick={() => setResumeFile(null)} className="ml-auto text-gray-600 hover:text-gray-400 text-xs">✕ Change</button>
-                  </div>
-                  {error && (
-                    <p className="text-red-400 text-sm text-center bg-red-500/10 rounded-lg py-2">{error}</p>
-                  )}
-                  <button
-                    onClick={startAiTechInterview}
-                    className="w-full py-3.5 rounded-xl font-bold text-white transition-all"
-                    style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}>
-                    🚀 Start Technical Round
-                  </button>
-                  <button onClick={resetAll} className="block mx-auto text-gray-600 text-xs hover:text-gray-400 transition-all">
-                    ← Exit and Back to Setup
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Questions loading from socket */}
-            {resumeFile && !resumeAnalyzing && socket && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center space-y-4">
-                  <div className="flex justify-center gap-1.5 mb-4">
-                    {[0,1,2,3].map(i => (
-                      <div key={i} className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce"
-                        style={{ animationDelay: `${i * 0.15}s` }} />
-                    ))}
-                  </div>
-                  <p className="text-white text-sm">⏳ Loading technical questions...</p>
-                </div>
-              </div>
-            )}
+            
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-left">
+              <p className="text-blue-400 text-sm font-semibold mb-2">Rules:</p>
+              <ul className="text-blue-300/80 text-xs space-y-1 list-disc pl-4">
+                <li>Fullscreen and Camera are required and will activate automatically.</li>
+                <li>Do not switch tabs or exit fullscreen during the test.</li>
+              </ul>
+            </div>
+            
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+            
+            <button onClick={() => {
+              if (aiSessionStage === 'technical' && !resumeFile) {
+                setError('Please upload your resume to continue.');
+                return;
+              }
+              setError('');
+              setSectionPhase('active');
+              setSessionStarted(false);
+            }} className="w-full py-3.5 rounded-xl font-semibold text-white transition-all" style={{ background: 'linear-gradient(135deg, #6366f1, #ef4444)' }}>
+              I'm Ready - Start Section
+            </button>
+            <button onClick={resetAll} className="block mx-auto text-gray-500 text-xs hover:text-gray-400">Exit to Dashboard</button>
           </div>
-        </>
+        </div>
       );
     }
 
-    const showLoadingState =
-      !sessionStarted ||
-      (aiSessionStage === 'aptitude' && aptitudeQuestions.length === 0);
+    // --- RESULT PHASE ---
+    if (sectionPhase === 'result') {
+      if (aiSessionStage === 'aptitude') {
+        const aptData = aptResultRef.current || aptResult;
+        const correct = aptData?.correct || 0;
+        const total = aptData?.total || 0;
+        const percent = total ? Math.round((correct/total)*100) : 0;
+        return (
+          <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f0c29, #111827)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+            <div style={{ width: '100%', maxWidth: '480px', background: 'rgba(17,24,39,0.95)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '24px', padding: '2.5rem', textAlign: 'center', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(16,185,129,0.2))', border: '2px solid rgba(99,102,241,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: '2rem' }}>&#129504;</div>
+              <h2 style={{ color: '#fff', fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>Aptitude Section Complete</h2>
+              <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Your aptitude score has been calculated and emailed to you.</p>
+              <div style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                <p style={{ color: '#a5b4fc', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Your Score</p>
+                <p style={{ color: '#fff', fontSize: '3rem', fontWeight: 800, lineHeight: 1 }}>{correct}<span style={{ color: '#6b7280', fontSize: '1.5rem' }}> / {total}</span></p>
+                <p style={{ color: '#818cf8', fontSize: '0.875rem', marginTop: '0.5rem' }}>{percent}% Accuracy</p>
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderRadius: '12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '0.8rem', fontWeight: 600, marginBottom: '1.5rem' }}>
+                <span style={{ width: '8px', height: '8px', background: '#34d399', borderRadius: '50%', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+                Result emailed to {user.email || 'you'}
+              </div>
+              <button onClick={() => { setAiSessionStage('coding'); setSectionPhase('instructions'); setCodingProblems([]); }} style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg, #6366f1, #ef4444)', border: 'none', cursor: 'pointer', fontSize: '1rem', marginBottom: '0.75rem' }}>
+                Proceed to Coding Round
+              </button>
+              <button onClick={resetAll} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '0.75rem' }}>Exit to Dashboard</button>
+            </div>
+          </div>
+        );
+      }
+      if (aiSessionStage === 'coding') {
+        const codData = aiCodingResultRef.current || aiCodingResult;
+        const solved = codData?.solved || 0;
+        const total = codData?.total || 0;
+        return (
+          <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f0c29, #111827)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+            <div style={{ width: '100%', maxWidth: '480px', background: 'rgba(17,24,39,0.95)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '24px', padding: '2.5rem', textAlign: 'center', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(239,68,68,0.2))', border: '2px solid rgba(245,158,11,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: '2rem' }}>&#128187;</div>
+              <h2 style={{ color: '#fff', fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>Coding Section Complete</h2>
+              <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Your coding scores have been evaluated and emailed to you.</p>
+              <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                <p style={{ color: '#fcd34d', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Problems Solved</p>
+                <p style={{ color: '#fff', fontSize: '3rem', fontWeight: 800, lineHeight: 1 }}>{solved}<span style={{ color: '#6b7280', fontSize: '1.5rem' }}> / {total}</span></p>
+                <p style={{ color: '#fbbf24', fontSize: '0.875rem', marginTop: '0.5rem' }}>Avg Score: {codData?.avgScore || 0} / 10</p>
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderRadius: '12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '0.8rem', fontWeight: 600, marginBottom: '1.5rem' }}>
+                <span style={{ width: '8px', height: '8px', background: '#34d399', borderRadius: '50%', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+                Result emailed to {user.email || 'you'}
+              </div>
+              <button onClick={() => { setAiSessionStage('technical'); setSectionPhase('instructions'); setSocket(null); }} style={{ width: '100%', padding: '0.875rem', borderRadius: '12px', fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg, #6366f1, #ef4444)', border: 'none', cursor: 'pointer', fontSize: '1rem', marginBottom: '0.75rem' }}>
+                Proceed to Technical Q&A
+              </button>
+              <button onClick={resetAll} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '0.75rem' }}>Exit to Dashboard</button>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    // --- ACTIVE PHASE ---
+    const showLoadingState = !sessionStarted || (aiSessionStage === 'aptitude' && aptitudeQuestions.length === 0);
 
     if (showLoadingState) {
       return (
         <ProctoringGuard
-          testTitle="AI Interview"
+          testTitle={'AI Interview - ' + aiSessionStage}
           onSessionStart={(info) => { setSessionStarted(true); setAiSessionStream(info?.stream || null); }}
           onDisqualified={handleAIDisqualified}
         >
@@ -1204,7 +1204,7 @@ export default function LiveInterview() {
               {aiSessionStage === 'aptitude' && aptitudeQuestions.length === 0 && (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center space-y-3">
-                    <div className="text-white text-sm animate-pulse">🧠 Loading aptitude questions...</div>
+                    <div className="text-white text-sm animate-pulse"> Loading aptitude questions...</div>
                     {error && (
                       <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 max-w-sm">
                         <p className="text-red-400 text-sm">{error}</p>
@@ -1214,17 +1214,39 @@ export default function LiveInterview() {
                   </div>
                 </div>
               )}
+              {aiSessionStage === 'technical' && resumeAnalyzing && (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center space-y-4">
+                    <div className="flex justify-center gap-1.5 mb-4">
+                      {[0,1,2,3].map(i => (
+                        <div key={i} className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                      ))}
+                    </div>
+                    <p className="text-white text-sm"> Analysing resume, preparing questions...</p>
+                  </div>
+                </div>
+              )}
+              {aiSessionStage === 'technical' && !resumeAnalyzing && !socket && (
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <div className="text-center">
+                    <button onClick={startAiTechInterview} className="w-full max-w-xs py-3.5 px-6 rounded-xl font-bold text-white transition-all" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                       Begin Voice Interview
+                    </button>
+                  </div>
+                </div>
+              )}
+              {aiSessionStage === 'technical' && !resumeAnalyzing && socket && stage !== 'interview' && (
+                <div className="flex-1 flex items-center justify-center text-white text-sm animate-pulse">
+                   Connecting to interview room...
+                </div>
+              )}
             </div>
           )}
         </ProctoringGuard>
       );
     }
-
-    // Session is active and content is ready — fall through to dedicated render blocks below.
-    // ProctoringGuard overlays (warning modal, camera thumbnail, violation badge) are added
-    // by the proctoring system independently. The lower if-blocks already handle
-    // stage === 'ai_interview' and will render the correct content.
-    // We just need to NOT return here so execution continues to those blocks.
+    
+    // Session is active and content is ready - fall through to dedicated render blocks below.
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1282,12 +1304,12 @@ export default function LiveInterview() {
           <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
             <div className="flex items-center gap-3">
               <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-              <span className="text-indigo-400 text-sm font-semibold">🧠 Section 1 of 3 — Aptitude</span>
+              <span className="text-indigo-400 text-sm font-semibold"> Section 1 of 3 — Aptitude</span>
             </div>
             {sessionViolations > 0 && (
               <span className="text-xs font-bold px-2 py-0.5 rounded-full"
                 style={{ color: '#f87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                ⚠ {sessionViolations}/3 violations
+                 {sessionViolations}/3 violations
               </span>
             )}
           </div>
@@ -1370,7 +1392,7 @@ export default function LiveInterview() {
               {/* LEFT: Section info + section timer */}
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0" style={{ background: '#6366f120', border: '1px solid #6366f130' }}>
-                  {currentSection.icon || '📝'}
+                  {currentSection.icon || ''}
                 </div>
                 <div>
                   <h2 className="text-gray-900 dark:text-white font-bold text-lg">{currentSection.section} Section</h2>
@@ -1510,7 +1532,7 @@ export default function LiveInterview() {
                 <button id="apt-submit" onClick={submitAptitude} disabled={aptSubmitting}
                   className="px-8 py-3 rounded-xl font-bold text-white text-sm transition-all shadow-lg hover:shadow-emerald-500/20"
                   style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-                  {aptSubmitting ? 'Submitting Test...' : '🏁 Submit Exam'}
+                  {aptSubmitting ? 'Submitting Test...' : ' Submit Exam'}
                 </button>
               ) : (
                 <button id="apt-next" onClick={handleNextAptQuestion}
@@ -1624,12 +1646,12 @@ export default function LiveInterview() {
             <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
               <div className="flex items-center gap-3">
                 <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-                <span className="text-yellow-400 text-sm font-semibold">💻 Section 2 of 3 — Coding</span>
+                <span className="text-yellow-400 text-sm font-semibold"> Section 2 of 3 — Coding</span>
               </div>
             </div>
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center space-y-3">
-                <div className="text-white text-sm animate-pulse">💻 Loading coding problems...</div>
+                <div className="text-white text-sm animate-pulse"> Loading coding problems...</div>
                 {error && <p className="text-red-400 text-sm">{error}</p>}
               </div>
             </div>
@@ -1654,22 +1676,22 @@ export default function LiveInterview() {
           <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
             <div className="flex items-center gap-3">
               <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-              <span className="text-yellow-400 text-sm font-semibold">💻 Section 2 of 3 — Coding</span>
+              <span className="text-yellow-400 text-sm font-semibold"> Section 2 of 3 — Coding</span>
             </div>
             {sessionViolations > 0 && (
               <span className="text-xs font-bold px-2 py-0.5 rounded-full"
                 style={{ color: '#f87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                ⚠ {sessionViolations}/3 violations
+                 {sessionViolations}/3 violations
               </span>
             )}
           </div>
         )}
-        <div className="h-screen bg-gray-50 dark:bg-gray-950 flex flex-col overflow-hidden transition-colors duration-300">
+        <div className="h-screen bg-gray-950 flex flex-col overflow-hidden">
           {/* Top bar */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-gray-800 bg-gray-900">
           <div className="flex items-center gap-4">
-            <h2 className="text-gray-900 dark:text-white font-bold">💻 Coding Round</h2>
-            <span className="text-gray-500 dark:text-gray-400 text-sm">Problem {codingProblemIndex + 1} of {codingProblems.length}</span>
+            <h2 className="text-white font-bold"> Coding Round</h2>
+            <span className="text-gray-400 text-sm">Problem {codingProblemIndex + 1} of {codingProblems.length}</span>
             <span className="text-xs px-2.5 py-1 rounded-lg font-bold font-mono animate-pulse"
               style={{
                 fontFamily: 'JetBrains Mono, monospace',
@@ -1677,31 +1699,31 @@ export default function LiveInterview() {
                 color: codingTimeLeft <= 180 ? '#ef4444' : '#fbbf24',
                 border: codingTimeLeft <= 180 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)'
               }}>
-              ⏳ {Math.floor(codingTimeLeft / 60)}:{codingTimeLeft % 60 < 10 ? `0${codingTimeLeft % 60}` : codingTimeLeft % 60}
+               {Math.floor(codingTimeLeft / 60)}:{codingTimeLeft % 60 < 10 ? `0${codingTimeLeft % 60}` : codingTimeLeft % 60}
             </span>
           </div>
           <div className="flex items-center gap-3">
             {codingResults.length > 0 && (
-              <span className="text-green-500 dark:text-green-400 text-xs font-medium">{codingResults.length} solved</span>
+              <span className="text-green-400 text-xs font-medium">{codingResults.length} solved</span>
             )}
-            <button onClick={resetAll} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-sm transition-all">✕ Exit</button>
+            <button onClick={resetAll} className="text-gray-400 hover:text-gray-200 text-sm transition-all">Exit</button>
           </div>
         </div>
 
         {/* Main panel */}
         <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 57px)' }}>
           {/* Left: Problem statement */}
-          <div className="w-2/5 border-r border-gray-200 dark:border-gray-800 overflow-y-auto p-5 space-y-4 bg-white dark:bg-gray-900">
+          <div className="w-2/5 border-r-2 border-indigo-500/30 overflow-y-auto p-5 space-y-4 bg-gray-900" style={{ borderRight: '2px solid rgba(99,102,241,0.4)' }}>
             <div className="flex items-center gap-2">
-              <h3 className="text-gray-900 dark:text-white font-bold text-lg">{prob.title}</h3>
+              <h3 className="text-white font-bold text-lg">{prob.title}</h3>
               <DiffBadge d={prob.difficulty} />
             </div>
 
-            <pre className="text-gray-700 dark:text-gray-300 text-sm whitespace-pre-wrap leading-relaxed font-sans">{prob.description}</pre>
+            <pre className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed font-sans">{prob.description}</pre>
 
             {/* Problem progress */}
             <div className="pt-3 border-t border-gray-200 dark:border-gray-800">
-              <p className="text-gray-500 text-xs mb-2">Progress</p>
+              <p className="text-gray-400 text-xs mb-2">Progress</p>
               <div className="flex gap-2">
                 {codingProblems.map((_, i) => {
                   const isSolved = codingResults.find(r => r.problemId === i);
@@ -1719,9 +1741,9 @@ export default function LiveInterview() {
 
             {/* Evaluation result */}
             {codingEval && (
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 space-y-3 border border-gray-200 dark:border-gray-700">
+              <div className="bg-gray-800 rounded-xl p-4 space-y-3 border border-gray-700">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-gray-900 dark:text-white">AI Evaluation</span>
+                  <span className="font-semibold text-white">AI Evaluation</span>
                   <span className="text-lg font-bold" style={{ color: codingEval.score >= 7 ? '#22c55e' : codingEval.score >= 4 ? '#f59e0b' : '#ef4444' }}>
                     {codingEval.score}/10
                   </span>
@@ -1730,9 +1752,9 @@ export default function LiveInterview() {
                   style={{ background: codingEval.verdict === 'Correct' ? '#22c55e20' : codingEval.verdict === 'Partially Correct' ? '#f59e0b20' : '#ef444420', color: codingEval.verdict === 'Correct' ? '#4ade80' : codingEval.verdict === 'Partially Correct' ? '#fbbf24' : '#f87171' }}>
                   {codingEval.verdict}
                 </div>
-                <p className="text-gray-600 dark:text-gray-300 text-xs leading-relaxed">{codingEval.feedback}</p>
-                {codingEval.hints && <p className="text-blue-600 dark:text-blue-400 text-xs font-medium">💡 {codingEval.hints}</p>}
-                {codingEval.timeComplexity && <p className="text-gray-400 dark:text-gray-500 text-xs">⏱ Time: {codingEval.timeComplexity}</p>}
+                <p className="text-gray-300 text-xs leading-relaxed">{codingEval.feedback}</p>
+                {codingEval.hints && <p className="text-blue-400 text-xs font-medium"> {codingEval.hints}</p>}
+                {codingEval.timeComplexity && <p className="text-gray-500 text-xs"> Time: {codingEval.timeComplexity}</p>}
 
                 <div className="flex gap-2 pt-1">
                   {codingProblemIndex < codingProblems.length - 1 ? (
@@ -1745,7 +1767,7 @@ export default function LiveInterview() {
                     <button id="btn-finish-coding" onClick={() => { if (stage === 'ai_interview') { onCodingComplete(codingResults); } else { setStage('result'); setResult({ type: 'coding', results: codingResults }); } }}
                       className="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
                       style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}>
-                      🏁 Finish Round
+                       Finish Round
                     </button>
                   )}
                   <button onClick={() => setCodingEval(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-450 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all">
@@ -1806,7 +1828,7 @@ export default function LiveInterview() {
                     style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
                     {codingSubmitting ? (
                       <><svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" /><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z" /></svg> Submitting...</>
-                    ) : '⚡ Submit Code'}
+                    ) : ' Submit Code'}
                   </button>
                 </div>
               </div>
@@ -1933,7 +1955,7 @@ export default function LiveInterview() {
             <div className="relative z-10 space-y-8">
               <div className="text-center space-y-3">
                 <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
-                  <span className="text-4xl">🎉</span>
+                  <span className="text-4xl"></span>
                 </div>
                 <h2 className="text-gray-900 dark:text-white text-3xl font-extrabold tracking-tight">Your assessment was successfully submitted!</h2>
                 <p className="text-emerald-500 dark:text-emerald-400 font-medium text-sm px-4 py-2 bg-emerald-500/10 inline-block rounded-full border border-emerald-500/20">
@@ -1962,7 +1984,7 @@ export default function LiveInterview() {
                             feedbackRatings[qIdx] >= star ? 'text-yellow-400' : 'text-gray-350 dark:text-gray-700'
                           }`}
                         >
-                          ★
+                          
                         </button>
                       ))}
                     </div>
@@ -1984,7 +2006,7 @@ export default function LiveInterview() {
           ) : (
             <div className="relative z-10 text-center space-y-6 py-12">
               <div className="w-24 h-24 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/20">
-                <span className="text-5xl">❤️</span>
+                <span className="text-5xl">️</span>
               </div>
               <h2 className="text-gray-900 dark:text-white text-3xl font-extrabold tracking-tight">Thank You!</h2>
               <p className="text-gray-650 dark:text-gray-400 text-base max-w-md mx-auto">
@@ -2012,7 +2034,7 @@ export default function LiveInterview() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 md:p-8 transition-colors duration-300">
         <div className="max-w-[1600px] mx-auto space-y-6">
           <div className="text-center space-y-4">
-            <div className="text-4xl">{avg >= 70 ? '🏆' : avg >= 40 ? '💪' : '📚'}</div>
+            <div className="text-4xl">{avg >= 70 ? '' : avg >= 40 ? '' : ''}</div>
             <h2 className="text-gray-900 dark:text-white text-2xl font-bold">Coding Round Complete!</h2>
             <div className="flex justify-center"><ScoreRing score={avg} size={140} /></div>
             <p className="text-gray-600 dark:text-gray-400">{results.length} problems attempted · Average score {avg}/100</p>
@@ -2032,7 +2054,7 @@ export default function LiveInterview() {
           <button id="btn-coding-retry" onClick={resetAll}
             className="w-full py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90"
             style={{ background: 'linear-gradient(135deg, #6366f1, #ef4444)' }}>
-            🔄 Try Again
+             Try Again
           </button>
         </div>
       </div>
@@ -2054,7 +2076,7 @@ export default function LiveInterview() {
             onDisqualified={handleManualDisqualified}
           >
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center space-y-6 shadow-xl">
-              <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-4xl animate-bounce" style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)' }}>✅</div>
+              <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-4xl animate-bounce" style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)' }}></div>
               <div>
                 <h2 className="text-gray-900 dark:text-white font-bold text-xl mb-2">You've Joined!</h2>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">Waiting for the interviewer to start...</p>
@@ -2068,7 +2090,7 @@ export default function LiveInterview() {
           </ProctoringGuard>
         ) : role === 'student' ? (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center space-y-6 shadow-xl">
-            <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-4xl animate-bounce" style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)' }}>🤖</div>
+            <div className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center text-4xl animate-bounce" style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)' }}></div>
             <div>
               <h2 className="text-gray-900 dark:text-white font-bold text-xl mb-2">AI is Preparing Your Interview</h2>
               <p className="text-gray-600 dark:text-gray-400 text-sm">Generating personalized questions from your resume...</p>
@@ -2094,7 +2116,7 @@ export default function LiveInterview() {
               {isRoomCreator ? (
                 /* Admin who created the room */
                 <>
-                  <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-3xl" style={{ background: '#ef444420' }}>🎙️</div>
+                  <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-3xl" style={{ background: '#ef444420' }}>️</div>
                   <h2 className="text-gray-900 dark:text-white font-bold text-xl">Interview Room Ready</h2>
                   <p className="text-gray-650 dark:text-gray-400 text-sm">Share the Room ID with the candidate to let them join</p>
 
@@ -2110,12 +2132,12 @@ export default function LiveInterview() {
                     </button>
                     <a href={`https://wa.me/?text=Join my SmartHire AI interview. Room ID: ${roomId} — Go to the Interview page and click "Join Room"`} target="_blank" rel="noreferrer"
                       className="px-5 py-2.5 rounded-xl text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-all">
-                      WhatsApp 📲
+                      WhatsApp 
                     </a>
                   </div>
 
                   <div className="bg-gray-800 rounded-xl p-3 text-left text-xs text-gray-400 space-y-1">
-                    <p className="text-gray-300 font-semibold mb-1">📋 How the candidate joins:</p>
+                    <p className="text-gray-300 font-semibold mb-1"> How the candidate joins:</p>
                     <p>1. Open the <strong className="text-white">Interview</strong> page</p>
                     <p>2. Select <strong className="text-white">HR Live Interview</strong></p>
                     <p>3. Enter their name, choose <strong className="text-white">Student / Candidate</strong></p>
@@ -2130,13 +2152,13 @@ export default function LiveInterview() {
                   <button id="btn-start-live-interview" onClick={startInterview}
                     className="w-full py-3.5 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all shadow-lg"
                     style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-                    🚀 Start Interview Session
+                     Start Interview Session
                   </button>
                 </>
               ) : (
                 /* Candidate who joined via Room ID */
                 <>
-                  <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-3xl animate-pulse" style={{ background: '#22c55e20' }}>✅</div>
+                  <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-3xl animate-pulse" style={{ background: '#22c55e20' }}></div>
                   <h2 className="text-white font-bold text-xl">You've Joined!</h2>
                   <p className="text-gray-400 text-sm">You are connected to room <span className="text-white font-mono font-bold">{roomId}</span></p>
                   <div className="flex justify-center gap-1.5 pt-2">
@@ -2156,7 +2178,7 @@ export default function LiveInterview() {
             {/* Email invite — only for room creator */}
             {isRoomCreator && (
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 space-y-3 shadow-md">
-                <h3 className="text-gray-900 dark:text-white font-semibold text-sm">📧 Email Invitation</h3>
+                <h3 className="text-gray-900 dark:text-white font-semibold text-sm"> Email Invitation</h3>
                 <input type="text" value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="Candidate name (optional)"
                   className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-350 dark:border-gray-700 text-gray-800 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-red-500" />
                 <div className="flex gap-2">
@@ -2165,7 +2187,7 @@ export default function LiveInterview() {
                   <button id="btn-send-invite" onClick={handleSendEmailInvite} disabled={emailSending || !inviteEmail}
                     className="px-4 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50 transition-all"
                     style={{ background: '#ef4444' }}>
-                    {emailSending ? '...' : emailSent ? '✅' : 'Send'}
+                    {emailSending ? '...' : emailSent ? '' : 'Send'}
                   </button>
                 </div>
               </div>
@@ -2205,7 +2227,7 @@ export default function LiveInterview() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-green-600 dark:text-green-400 text-sm font-medium">🤖 AI Interview</span>
+                <span className="text-green-600 dark:text-green-400 text-sm font-medium"> AI Interview</span>
               </div>
               <span className="px-2.5 py-1 rounded-lg text-xs font-semibold" style={{ background: '#6366f120', color: '#818cf8', border: '1px solid #6366f130' }}>
                 Q {questionNumber} / {totalQuestions}
@@ -2249,7 +2271,7 @@ export default function LiveInterview() {
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 mt-1"
                       style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)', border: '1px solid #6366f130' }}>
-                      🤖
+                      
                     </div>
                     <div className="flex-1 bg-white dark:bg-gray-900 border border-indigo-500/30 rounded-2xl rounded-tl-none p-5 space-y-2 shadow-sm">
                       <div className="flex items-center gap-2 mb-3">
@@ -2270,7 +2292,7 @@ export default function LiveInterview() {
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 mt-1"
                       style={{ background: isDark ? '#1f2937' : '#f3f4f6', border: `1px solid ${isDark ? '#374151' : '#d1d5db'}` }}>
-                      👤
+                      
                     </div>
                     <div className="flex-1 space-y-3">
                       <textarea
@@ -2284,7 +2306,7 @@ export default function LiveInterview() {
                         <button id="btn-voice-toggle" onClick={toggleVoice}
                           className="px-4 py-2.5 rounded-xl text-sm font-medium border transition-all"
                           style={{ borderColor: isListening ? '#ef4444' : (isDark ? '#374151' : '#d1d5db'), background: isListening ? '#ef444420' : (isDark ? '#1f2937' : '#f3f4f6'), color: isListening ? '#f87171' : (isDark ? '#9ca3af' : '#4b5563') }}>
-                          {isListening ? '🔴 Stop' : '🎙️ Voice'}
+                          {isListening ? ' Stop' : '️ Voice'}
                         </button>
                         <button id="btn-submit-answer" onClick={handleSubmitAnswer} disabled={!answer.trim()}
                           className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40 transition-all"
@@ -2310,7 +2332,7 @@ export default function LiveInterview() {
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl animate-pulse"
-                    style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)' }}>🤖</div>
+                    style={{ background: 'linear-gradient(135deg, #6366f120, #ef444420)' }}></div>
                   <p className="text-gray-650 dark:text-gray-400 text-sm">AI is preparing your next question...</p>
                 </div>
               )}
@@ -2377,7 +2399,7 @@ export default function LiveInterview() {
                   <div className="flex flex-col flex-1 overflow-y-auto p-4 space-y-4">
                     {candidateDisqualified && (
                       <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.1)', border: '2px solid rgba(239,68,68,0.4)' }}>
-                        <p className="text-red-400 font-bold text-sm">🚫 Candidate Disqualified</p>
+                        <p className="text-red-400 font-bold text-sm"> Candidate Disqualified</p>
                         <p className="text-red-300 text-xs mt-1">
                           Candidate was auto-disqualified after {candidateDisqualified.violations}/3 violations.
                           Reason: {candidateDisqualified.reason}
@@ -2385,7 +2407,7 @@ export default function LiveInterview() {
                       </div>
                     )}
                     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
-                      <h3 className="text-white font-semibold text-sm">📤 Send Question</h3>
+                      <h3 className="text-white font-semibold text-sm"> Send Question</h3>
                       <select value={adminTopic} onChange={e => setAdminTopic(e.target.value)}
                         className="w-full bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500">
                         {['General', 'Technical', 'Behavioral', 'Problem Solving', 'HR'].map(t => (
@@ -2404,7 +2426,7 @@ export default function LiveInterview() {
                     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
-                        <h3 className="text-white font-semibold text-sm">🤖 AI Monitor</h3>
+                        <h3 className="text-white font-semibold text-sm"> AI Monitor</h3>
                       </div>
                       {aiMonitorLog.length === 0 ? (
                         <p className="text-gray-600 text-xs text-center py-3">Waiting for student answers...</p>
@@ -2413,12 +2435,12 @@ export default function LiveInterview() {
                       ))}
                     </div>
                     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
-                      <h3 className="text-white font-semibold text-sm">📋 Manual Evaluation</h3>
+                      <h3 className="text-white font-semibold text-sm"> Manual Evaluation</h3>
                       {Object.entries(evalScores).map(([key, val]) => (
                         <div key={key}>
                           <div className="flex justify-between mb-1">
                             <label className="text-gray-400 text-xs capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</label>
-                            <span className="text-yellow-400 text-xs font-bold">{val}/5 {'⭐'.repeat(val)}</span>
+                            <span className="text-yellow-400 text-xs font-bold">{val}/5 {''.repeat(val)}</span>
                           </div>
                           <input type="range" min="0" max="5" step="1" value={val}
                             onChange={e => setEvalScores(prev => ({ ...prev, [key]: parseInt(e.target.value) }))}
@@ -2443,7 +2465,7 @@ export default function LiveInterview() {
                           <button id="btn-voice-toggle" onClick={toggleVoice}
                             className="px-4 py-2 rounded-lg text-sm font-medium border transition-all"
                             style={{ borderColor: isListening ? '#ef4444' : '#374151', background: isListening ? '#ef444420' : '#1f2937', color: isListening ? '#f87171' : '#9ca3af' }}>
-                            {isListening ? '🔴 Stop' : '🎙️ Voice'}
+                            {isListening ? ' Stop' : '️ Voice'}
                           </button>
                           <button id="btn-submit-answer" onClick={handleSubmitAnswer} disabled={!answer.trim()}
                             className="flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
@@ -2463,7 +2485,7 @@ export default function LiveInterview() {
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center flex-1 text-center py-10">
-                        <div className="text-3xl mb-3">⏳</div>
+                        <div className="text-3xl mb-3"></div>
                         <p className="text-gray-400 text-sm">Waiting for the interviewer to send a question...</p>
                       </div>
                     )}
@@ -2521,7 +2543,7 @@ export default function LiveInterview() {
       <div className="min-h-screen bg-gray-950 p-4 md:p-8">
         <div className="max-w-[1600px] mx-auto space-y-6">
           <div className="text-center space-y-4">
-            <div className="text-4xl">{result.totalScore >= 70 ? '🏆' : '📊'}</div>
+            <div className="text-4xl">{result.totalScore >= 70 ? '' : ''}</div>
             <h2 className="text-white text-2xl font-bold">Interview Complete!</h2>
             <div className="flex justify-center"><ScoreRing score={result.totalScore} size={140} /></div>
             <p className="text-gray-400">{result.message}</p>
@@ -2536,7 +2558,7 @@ export default function LiveInterview() {
               </div>
             </div>
           ))}
-          <button onClick={resetAll} className="w-full py-3 rounded-xl font-semibold text-white" style={{ background: 'linear-gradient(135deg, #6366f1, #ef4444)' }}>🔄 New Session</button>
+          <button onClick={resetAll} className="w-full py-3 rounded-xl font-semibold text-white" style={{ background: 'linear-gradient(135deg, #6366f1, #ef4444)' }}> New Session</button>
         </div>
       </div>
     );

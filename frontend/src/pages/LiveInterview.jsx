@@ -1143,9 +1143,13 @@ export default function LiveInterview() {
               <h2 style={{ color: '#fff', fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>Aptitude Section Complete</h2>
               <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Your aptitude score has been calculated and emailed to you.</p>
               <div style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-                <p style={{ color: '#a5b4fc', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Your Score</p>
-                <p style={{ color: '#fff', fontSize: '3rem', fontWeight: 800, lineHeight: 1 }}>{correct}<span style={{ color: '#6b7280', fontSize: '1.5rem' }}> / {total}</span></p>
-                <p style={{ color: '#818cf8', fontSize: '0.875rem', marginTop: '0.5rem' }}>{percent}% Accuracy</p>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '2.5rem' }}>✉️</span>
+                  <p style={{ color: '#fff', fontSize: '1.125rem', fontWeight: 600 }}>Check Your Inbox</p>
+                  <p style={{ color: '#a5b4fc', fontSize: '0.875rem', textAlign: 'center' }}>
+                    We've hidden the scores here to keep you focused. Your detailed section report has been sent to your registered email.
+                  </p>
+                </div>
               </div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderRadius: '12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '0.8rem', fontWeight: 600, marginBottom: '1.5rem' }}>
                 <span style={{ width: '8px', height: '8px', background: '#34d399', borderRadius: '50%', display: 'inline-block', animation: 'pulse 2s infinite' }} />
@@ -1170,9 +1174,13 @@ export default function LiveInterview() {
               <h2 style={{ color: '#fff', fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>Coding Section Complete</h2>
               <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Your coding scores have been evaluated and emailed to you.</p>
               <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-                <p style={{ color: '#fcd34d', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Problems Solved</p>
-                <p style={{ color: '#fff', fontSize: '3rem', fontWeight: 800, lineHeight: 1 }}>{solved}<span style={{ color: '#6b7280', fontSize: '1.5rem' }}> / {total}</span></p>
-                <p style={{ color: '#fbbf24', fontSize: '0.875rem', marginTop: '0.5rem' }}>Avg Score: {codData?.avgScore || 0} / 10</p>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '2.5rem' }}>✉️</span>
+                  <p style={{ color: '#fff', fontSize: '1.125rem', fontWeight: 600 }}>Check Your Inbox</p>
+                  <p style={{ color: '#fcd34d', fontSize: '0.875rem', textAlign: 'center' }}>
+                    We've hidden the scores here to keep you focused. Your detailed section report has been sent to your registered email.
+                  </p>
+                </div>
               </div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderRadius: '12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '0.8rem', fontWeight: 600, marginBottom: '1.5rem' }}>
                 <span style={{ width: '8px', height: '8px', background: '#34d399', borderRadius: '50%', display: 'inline-block', animation: 'pulse 2s infinite' }} />

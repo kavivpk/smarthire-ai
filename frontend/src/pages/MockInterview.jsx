@@ -445,87 +445,27 @@ export default function MockInterview() {
       {stage === 'result' && result && (
         <div className="space-y-4">
 
-          {/* Score */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 text-center"
-            style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-            <p style={{ fontFamily:'Inter, sans-serif', fontSize:13, letterSpacing:'0.04em', textTransform:'uppercase' }}
-              className="text-gray-500 dark:text-gray-400 mb-3">
-              {selectedTopic?.label} Interview Score
+          {/* Success Message instead of Scores */}
+          <div className="bg-white dark:bg-gray-900 border border-purple-500/30 rounded-2xl p-10 text-center"
+            style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(168,85,247,0.2)' }}>
+            
+            <div className="w-20 h-20 mx-auto bg-purple-500/10 rounded-full flex items-center justify-center mb-6">
+              <span className="text-4xl">✉️</span>
+            </div>
+            
+            <h2 style={{ fontFamily:'Sora, sans-serif', fontSize:24, fontWeight:700 }} className="text-gray-900 dark:text-white mb-2">
+              Interview Complete!
+            </h2>
+            
+            <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm max-w-md mx-auto">
+              Your mock interview answers have been evaluated. To keep you focused, we've hidden the scores here. A detailed report with all your marks and feedback has been sent to your registered email address.
             </p>
-            <div className="relative w-32 h-32 mx-auto mb-3">
-              <svg viewBox="0 0 36 36" className="w-32 h-32 -rotate-90">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke={isDark ? '#1f2937' : '#e5e7eb'} strokeWidth="2.5"/>
-                <circle cx="18" cy="18" r="15.9" fill="none"
-                  stroke={getScoreColor(result.totalScore)}
-                  strokeWidth="2.5"
-                  strokeDasharray={`${result.totalScore * 10} 100`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span style={{ fontFamily:'JetBrains Mono, monospace', fontSize:32, fontWeight:700, letterSpacing:'-0.02em', color:getScoreColor(result.totalScore) }}>
-                  {result.totalScore}
-                </span>
-                <span style={{ fontFamily:'Inter, sans-serif', fontSize:12 }} className="text-gray-400">/ 10</span>
-              </div>
+
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-sm font-semibold">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              Detailed report sent to your email
             </div>
-            <span className="text-sm font-medium px-3 py-1 rounded-full"
-              style={{
-                backgroundColor: `${getScoreColor(result.totalScore)}20`,
-                color: getScoreColor(result.totalScore)
-              }}>
-              {result.totalScore >= 7 ? 'Excellent' : result.totalScore >= 4 ? 'Average' : 'Needs Practice'}
-            </span>
           </div>
-
-          {result.technicalSummary && (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-4">
-                Technical Interview Summary
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                {[
-                  ['Technical', result.technicalSummary.averageTechnical],
-                  ['Communication', result.technicalSummary.averageCommunication],
-                  ['Grammar', result.technicalSummary.averageGrammar],
-                  ['Confidence', result.technicalSummary.averageConfidence],
-                ].map(([label, score]) => (
-                  <div key={label} className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-                    <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">{label}</p>
-                    <p className="font-bold text-sm" style={{ color: getScoreColor(score) }}>{score}/10</p>
-                  </div>
-                ))}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
-                <p>Strongest: <span className="text-gray-900 dark:text-white">{result.technicalSummary.strongestSkill}</span></p>
-                <p>Weakest: <span className="text-gray-900 dark:text-white">{result.technicalSummary.weakestSkill}</span></p>
-                <p>{result.technicalSummary.recommendations?.[0]}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Per question */}
-          {result.results.map((r, i) => (
-            <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
-              <div className="flex justify-between items-start mb-2">
-                <p className="text-gray-900 dark:text-white font-medium text-sm flex-1 pr-4">
-                  Q{i + 1}: {r.question}
-                </p>
-                <span className="text-sm font-bold flex-shrink-0"
-                  style={{ color: getScoreColor(r.score) }}>
-                  {r.score}/10
-                </span>
-              </div>
-              <p className="text-gray-500 dark:text-gray-400 text-xs mb-2">
-                Your answer: {r.userAnswer.slice(0, 100)}{r.userAnswer.length > 100 ? '...' : ''}
-              </p>
-              <div className="flex items-start gap-2 text-xs p-3 rounded-lg"
-                style={{ backgroundColor: `${getScoreColor(r.score)}10` }}>
-                <span style={{ color: getScoreColor(r.score) }}>→</span>
-                <span style={{ color: getScoreColor(r.score) }}>{r.feedback}</span>
-              </div>
-            </div>
-          ))}
 
           <button
             onClick={() => {

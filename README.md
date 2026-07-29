@@ -5,7 +5,7 @@ SmartHire AI is an advanced, AI-powered placement preparation platform designed 
 ## 🌟 Key Features
 
 1. **AI Resume Analysis (ATS)** 📄
-   - Automatically parses PDF resumes.
+   - Automatically parses PDF resumes using `pdfplumber`.
    - Computes an ATS score based on keywords and formatting.
    - Highlights missing skills to help you pass automated screening.
 
@@ -32,7 +32,7 @@ SmartHire AI is an advanced, AI-powered placement preparation platform designed 
 ## 🛠️ Tech Stack
 
 - **Frontend**: React, Vite, Tailwind CSS, Monaco Editor
-- **Backend**: Node.js, Express, MongoDB, Socket.io, Nodemailer, JSON Web Tokens (JWT)
+- **Backend**: Python 3.11, FastAPI, MySQL, SQLAlchemy, python-socketio, PyJWT
 - **AI Service**: Python, FastAPI, scikit-learn, Groq (Llama-3 models)
 
 ## 🚀 Local Setup
@@ -49,12 +49,13 @@ copy ai-service\.env.example ai-service\.env
 
 **Backend (`backend/.env`)**
 - `PORT=5000`
-- `MONGO_URI=mongodb://127.0.0.1:27017/smarthire-ai`
+- `DATABASE_URL=mysql+pymysql://root:YOUR_PASSWORD@localhost:3306/smarthire_db`
 - `JWT_SECRET=your-secret-key`
 - `FRONTEND_URL=http://localhost:5173`
 - `EMAIL_USER=your-email@gmail.com`
 - `EMAIL_PASS=your-app-password`
 - `ADMIN_SECRET=smarthire2024` (Required to register an admin account)
+- `AI_SERVICE_URL=http://localhost:8000`
 
 **Frontend (`frontend/.env`)**
 - `VITE_API_URL=http://localhost:5000/api`
@@ -75,7 +76,8 @@ npm install
 **Backend:**
 ```powershell
 cd backend
-npm install
+python -m venv venv
+.\venv\Scripts\pip.exe install -r requirements.txt
 ```
 
 **AI Service:**
@@ -91,7 +93,7 @@ Open three separate terminals and start the development servers:
 **Backend:**
 ```powershell
 cd backend
-npm run dev
+.\venv\Scripts\uvicorn.exe main:sio_app --reload --port 5000
 ```
 
 **AI Service:**
@@ -99,7 +101,7 @@ npm run dev
 cd ai-service
 venv\Scripts\activate
 uvicorn main:app --reload --port 8000
-``` 
+```
 
 **Frontend:**
 ```powershell
@@ -114,14 +116,15 @@ The application will be available at `http://localhost:5173`.
 For deploying to production, follow these recommended platforms:
 
 - **Frontend**: [Vercel](https://vercel.com/) (Root: `frontend`, Build: `npm run build`, Output: `dist`)
-- **Backend**: [Render](https://render.com/) (Root: `backend`, Build: `npm ci --omit=dev`, Start: `npm start`)
+- **Backend**: Docker deployment via Dockerfile (`FROM python:3.11-slim`)
 - **AI Service**: [Railway](https://railway.app/) (Deploy via Dockerfile in `ai-service`)
-- **Database**: MongoDB Atlas
+- **Database**: MySQL (PlanetScale, AWS RDS, or Aiven MySQL)
 
-*Ensure all environment variables are correctly set in the deployment platforms matching the production URLs.*
+---
 
-## 📈 Recent Improvements & Fixes
+## 📈 Migration & Recent Improvements
 
+- 🔄 **Backend Stack Migration**: Fully migrated backend from Node.js/Express/MongoDB to **Python / FastAPI / MySQL (SQLAlchemy)**.
 - 🔒 **Admin Security**: Added `ADMIN_SECRET` verification to block standard users from gaining admin access.
 - 📊 **Enhanced Email Reports**: Aptitude test result emails now include a detailed section-by-section breakdown.
 - ✏️ **Dynamic Question Engine**: Admins can now add custom aptitude questions directly via the Admin Dashboard GUI.

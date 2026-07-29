@@ -1,11 +1,11 @@
-FROM node:22-alpine
+FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci --omit=dev
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
 EXPOSE 5000
-CMD ["npm", "start"]
+CMD ["uvicorn", "main:sio_app", "--host", "0.0.0.0", "--port", "5000"]

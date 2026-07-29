@@ -2212,7 +2212,7 @@ export default function LiveInterview() {
   // ══════════════════════════════════════════════════════════════════════════
   // RENDER: LIVE INTERVIEW (Admin + Student face-to-face)
   // ══════════════════════════════════════════════════════════════════════════
-  if (stage === 'interview' || (stage === 'ai_interview' && aiSessionStage === 'qa')) {
+  if (stage === 'interview' || (stage === 'ai_interview' && aiSessionStage === 'technical')) {
     const isAdmin = role === 'admin';
 
     // ── AI Self-Practice Interview (no video, no chat, single user) ──

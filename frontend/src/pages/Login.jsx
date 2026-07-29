@@ -24,7 +24,7 @@ export default function Login() {
       if (res.data.user.role === 'admin') navigate('/admin');
       else navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.detail || err.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }

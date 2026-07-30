@@ -3,7 +3,7 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Tex
 from sqlalchemy.sql import func
 from database import Base
 
-
+ 
 class Resume(Base):
     __tablename__ = "resumes"
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import API from '../services/api';
 import { AI_SERVICE_URL } from '../config/apiConfig';
 import { useTheme } from '../context/useTheme';
@@ -28,21 +28,76 @@ export default function MockInterview() {
   const [loading, setLoading] = useState(false);
   const [resumeFile, setResumeFile] = useState(null);
   const [resumeSkills, setResumeSkills] = useState([]);
-  const [questionCount, setQuestionCount] = useState(5);
+  const [difficulty, setDifficulty] = useState('medium'); // 'easy' | 'medium' | 'hard'
   const [mode, setMode] = useState('topic'); // 'topic' or 'resume'
   const [interviewId, setInterviewId] = useState('');
   const [currentEvaluation, setCurrentEvaluation] = useState(null);
   const [evaluatedAnswers, setEvaluatedAnswers] = useState([]);
   const [evaluationError, setEvaluationError] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  // Setup Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    let finalTranscript = '';
+    recognition.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + ' ';
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setCurrentAnswer(finalTranscript + interim);
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+      finalTranscript = '';
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognitionRef.current = recognition;
+  }, []);
+
+  const toggleVoice = () => {
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      alert('Voice input is not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+    if (isListening) {
+      recognition.stop();
+      setIsListening(false);
+    } else {
+      setCurrentAnswer('');
+      recognition.start();
+      setIsListening(true);
+    }
+  };
+
+  const DIFFICULTY_CONFIG = {
+    easy:   { count: 3,  label: 'Easy',   color: '#22c55e', bg: '#22c55e15', desc: '3 questions' },
+    medium: { count: 5,  label: 'Medium', color: '#f59e0b', bg: '#f59e0b15', desc: '5 questions' },
+    hard:   { count: 10, label: 'Hard',   color: '#ef4444', bg: '#ef444415', desc: '10 questions' },
+  };
 
   // Topic based interview
   const startTopicInterview = async (topic) => {
     setLoading(true);
     try {
       const res = await API.get(`/interview/questions/${topic.id}`);
+      // Slice questions based on difficulty
+      const count = DIFFICULTY_CONFIG[difficulty].count;
+      const sliced = res.data.questions.slice(0, count);
       setSelectedTopic(topic);
-      setQuestions(res.data.questions);
-      setQuestionData(res.data.questions);
+      setQuestions(sliced);
+      setQuestionData(sliced);
       setCurrentQ(0);
       setAnswers([]);
       setEvaluatedAnswers([]);
@@ -75,9 +130,10 @@ export default function MockInterview() {
       setResumeSkills(skills);
 
       // Get questions based on skills
+      const count = DIFFICULTY_CONFIG[difficulty].count;
       const qRes = await API.post('/interview/questions/from-skills', {
         skills,
-        questionCount
+        questionCount: count
       });
 
       setSelectedTopic({ id: 'mixed', label: 'Resume-Based' });
@@ -233,10 +289,29 @@ export default function MockInterview() {
           {mode === 'topic' && (
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
               style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-              <h3 style={{ fontFamily:'Sora, sans-serif', fontWeight:600, fontSize:15 }}
-                className="text-gray-900 dark:text-white mb-4">
-                Select Topic
-              </h3>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <h3 style={{ fontFamily:'Sora, sans-serif', fontWeight:600, fontSize:15 }}
+                  className="text-gray-900 dark:text-white">
+                  Select Topic
+                </h3>
+                {/* Difficulty selector */}
+                <div className="flex gap-2">
+                  {Object.entries(DIFFICULTY_CONFIG).map(([key, cfg]) => (
+                    <button
+                      key={key}
+                      onClick={() => setDifficulty(key)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all"
+                      style={{
+                        borderColor: difficulty === key ? cfg.color : borderDefault,
+                        backgroundColor: difficulty === key ? cfg.bg : 'transparent',
+                        color: difficulty === key ? cfg.color : undefined,
+                      }}
+                    >
+                      {cfg.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {TOPICS.map((topic) => (
                   <button
@@ -248,9 +323,8 @@ export default function MockInterview() {
                     <div className="font-semibold text-gray-900 dark:text-white text-sm mb-1">
                       {topic.label}
                     </div>
-                    <div className="text-xs"
-                      style={{ color: topic.color }}>
-                      5 questions
+                    <div className="text-xs" style={{ color: DIFFICULTY_CONFIG[difficulty].color }}>
+                      {DIFFICULTY_CONFIG[difficulty].desc}
                     </div>
                   </button>
                 ))}
@@ -290,25 +364,28 @@ export default function MockInterview() {
                 />
               </div>
 
-              {/* Question count */}
+              {/* Difficulty selector */}
               <div>
-                <div className="flex justify-between mb-2">
-                  <label className="text-gray-500 dark:text-gray-400 text-sm">
-                    Number of Questions
-                  </label>
-                  <span className="text-purple-500 font-medium text-sm">
-                    {questionCount}
-                  </span>
-                </div>
-                <input
-                  type="range" min="3" max="10" step="1"
-                  value={questionCount}
-                  onChange={(e) => setQuestionCount(parseInt(e.target.value))}
-                  className="w-full accent-purple-500"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>3 (Quick)</span>
-                  <span>10 (Full)</span>
+                <label className="text-gray-500 dark:text-gray-400 text-sm mb-3 block">
+                  Difficulty Level
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {Object.entries(DIFFICULTY_CONFIG).map(([key, cfg]) => (
+                    <button
+                      key={key}
+                      onClick={() => setDifficulty(key)}
+                      className="py-3 rounded-xl border-2 transition-all font-semibold text-sm"
+                      style={{
+                        borderColor: difficulty === key ? cfg.color : borderDefault,
+                        backgroundColor: difficulty === key ? cfg.bg : 'transparent',
+                        color: difficulty === key ? cfg.color : undefined,
+                        boxShadow: difficulty === key ? `0 0 12px ${cfg.color}30` : 'none',
+                      }}
+                    >
+                      <div>{cfg.label}</div>
+                      <div className="text-xs font-normal mt-0.5 opacity-75">{cfg.desc}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -394,15 +471,61 @@ export default function MockInterview() {
           {/* Answer */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-4"
             style={{ boxShadow:'0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-            <label style={{ fontFamily:'Inter, sans-serif', fontSize:12, fontWeight:600, letterSpacing:'0.05em', textTransform:'uppercase' }}
-              className="text-gray-500 dark:text-gray-400 mb-2 block">
-              Your Answer
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label style={{ fontFamily:'Inter, sans-serif', fontSize:12, fontWeight:600, letterSpacing:'0.05em', textTransform:'uppercase' }}
+                className="text-gray-500 dark:text-gray-400">
+                Your Answer
+              </label>
+              {/* Voice Button */}
+              <button
+                onClick={toggleVoice}
+                disabled={!!currentEvaluation}
+                title={isListening ? 'Stop recording' : 'Speak your answer'}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all disabled:opacity-40"
+                style={{
+                  borderColor: isListening ? '#ef4444' : '#a855f7',
+                  backgroundColor: isListening ? '#ef444415' : '#a855f715',
+                  color: isListening ? '#ef4444' : '#a855f7',
+                }}
+              >
+                {isListening ? (
+                  <>
+                    {/* Pulsing red dot */}
+                    <span style={{
+                      width: 8, height: 8, borderRadius: '50%',
+                      backgroundColor: '#ef4444',
+                      display: 'inline-block',
+                      animation: 'pulse 1s infinite',
+                    }} />
+                    Stop Recording
+                  </>
+                ) : (
+                  <>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                      <line x1="12" y1="19" x2="12" y2="23"/>
+                      <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                    Speak Answer
+                  </>
+                )}
+              </button>
+            </div>
+
+            {isListening && (
+              <div className="mb-2 px-3 py-2 rounded-lg flex items-center gap-2 text-xs"
+                style={{ backgroundColor: '#ef444410', color: '#ef4444', border: '1px solid #ef444430' }}>
+                <span style={{ width:8, height:8, borderRadius:'50%', backgroundColor:'#ef4444', display:'inline-block', animation:'pulse 1s infinite' }} />
+                Listening... speak your answer clearly
+              </div>
+            )}
+
             <textarea
               value={currentAnswer}
               onChange={(e) => setCurrentAnswer(e.target.value)}
               disabled={!!currentEvaluation}
-              placeholder="Type your answer here..."
+              placeholder={isListening ? 'Listening to your voice...' : 'Type your answer or click "Speak Answer" to use voice...'}
               rows={5}
               className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-500 transition-colors resize-none"
             />

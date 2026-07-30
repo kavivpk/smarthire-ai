@@ -2,10 +2,11 @@
   "python.defaultInterpreterPath": "e:\\Project\\smarthire-ai\\backend\\venv\\Scripts\\python.exe",
   "python.analysis.extraPaths": [
     "e:\\Project\\smarthire-ai\\backend",
-    "e:\\Project\\smarthire-ai\\backend\\venv\\Lib\\site-packages",
-    "e:\\Project\\smarthire-ai\\ai-service",
-    "e:\\Project\\smarthire-ai\\ai-service\\venv\\Lib\\site-packages"
+    "e:\\Project\\smarthire-ai\\backend\\venv\\Lib\\site-packages"
   ],
   "python.analysis.autoImportCompletions": true,
-  "python.analysis.diagnosticMode": "workspace"
+  "python.analysis.diagnosticMode": "workspace",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.python"
+  }
 }

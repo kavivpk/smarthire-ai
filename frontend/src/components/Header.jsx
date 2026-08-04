@@ -18,7 +18,8 @@ export default function Header() {
   const navLinks = [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'Resume', path: '/resume' },
-    { label: 'Interview', path: '/interview' },
+    { label: 'Mock Interview', path: '/interview' },
+    { label: 'Live Interview', path: '/live-interview' },
     { label: 'Skill Check', path: '/fakeskill' },
     ...(user.role === 'admin' ? [{ label: 'Bulk Screening', path: '/bulk-screening' }] : [])
   ];

@@ -5,7 +5,7 @@ import os
 import random
 import json
 import httpx
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel
@@ -359,6 +359,7 @@ coding_problems = [
 
 class FromSkillsRequest(BaseModel):
     skills: List[str]
+    questionCount: Optional[int] = 5
 
 class SubmitInterviewRequest(BaseModel):
     topic: str = "mixed"
@@ -448,19 +449,9 @@ def evaluate_answer_local(question: str, answer: str, custom_keywords: list = No
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.get("/questions/{topic}")
-def get_questions_by_topic(topic: str, current_user: dict = Depends(get_current_user)):
-    questions = skill_questions.get(topic.lower())
-    if not questions:
-        raise HTTPException(status_code=404, detail="Topic not found")
-
-    question_list = [{"id": i, "question": q["q"], "topic": topic} for i, q in enumerate(questions)]
-    return {"topic": topic, "questions": question_list}
-
-
 @router.post("/questions/from-skills")
 def get_questions_from_skills(req: FromSkillsRequest, current_user: dict = Depends(get_current_user)):
-    count = 35
+    count = req.questionCount or 5
     all_questions = []
     used_topics = set()
 
@@ -478,7 +469,7 @@ def get_questions_from_skills(req: FromSkillsRequest, current_user: dict = Depen
     for q in skill_questions["dsa"]:
         all_questions.append({"q": q["q"], "topic": "dsa", "keywords": q["keywords"]})
 
-    # If we have less than 35, fill from other technical topics
+    # If we have less than required count, fill from other technical topics
     if len(all_questions) < count:
         for topic, qs in skill_questions.items():
             if topic not in ["hr", "dsa"] and topic not in used_topics:
@@ -502,6 +493,16 @@ def get_questions_from_skills(req: FromSkillsRequest, current_user: dict = Depen
         "totalQuestions": len(result),
         "topicsCovered": list(used_topics)
     }
+
+
+@router.get("/questions/{topic}")
+def get_questions_by_topic(topic: str, current_user: dict = Depends(get_current_user)):
+    questions = skill_questions.get(topic.lower())
+    if not questions:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    question_list = [{"id": i, "question": q["q"], "topic": topic} for i, q in enumerate(questions)]
+    return {"topic": topic, "questions": question_list}
 
 
 @router.post("/submit")

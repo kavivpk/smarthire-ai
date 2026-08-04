@@ -36,32 +36,47 @@ export default function MockInterview() {
   const [evaluationError, setEvaluationError] = useState('');
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+  const isListeningRef = useRef(false);          // track listening state inside callbacks
+  const finalTranscriptRef = useRef('');         // persists across restarts & re-renders
 
-  // Setup Speech Recognition
+  // Setup Speech Recognition once
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
+
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
-    let finalTranscript = '';
+    recognition.lang = 'en-IN';   // better for Indian English accent
+
     recognition.onresult = (event) => {
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript + ' ';
+          finalTranscriptRef.current += event.results[i][0].transcript + ' ';
         } else {
           interim += event.results[i][0].transcript;
         }
       }
-      setCurrentAnswer(finalTranscript + interim);
+      // Show final + live interim text
+      setCurrentAnswer(finalTranscriptRef.current + interim);
     };
+
+    // Chrome stops after ~60 s of silence — restart automatically if still listening
     recognition.onend = () => {
-      setIsListening(false);
-      finalTranscript = '';
+      if (isListeningRef.current) {
+        try { recognition.start(); } catch (_) { /* already started */ }
+      } else {
+        setIsListening(false);
+      }
     };
-    recognition.onerror = () => setIsListening(false);
+
+    recognition.onerror = (e) => {
+      if (e.error === 'no-speech') return;   // ignore silence timeout
+      isListeningRef.current = false;
+      setIsListening(false);
+    };
+
     recognitionRef.current = recognition;
   }, []);
 
@@ -71,15 +86,21 @@ export default function MockInterview() {
       alert('Voice input is not supported in this browser. Please use Chrome or Edge.');
       return;
     }
-    if (isListening) {
+    if (isListeningRef.current) {
+      // Stop
+      isListeningRef.current = false;
       recognition.stop();
       setIsListening(false);
     } else {
+      // Start fresh
+      finalTranscriptRef.current = '';
       setCurrentAnswer('');
-      recognition.start();
+      isListeningRef.current = true;
       setIsListening(true);
+      try { recognition.start(); } catch (_) { /* already started */ }
     }
   };
+
 
   const DIFFICULTY_CONFIG = {
     easy:   { count: 3,  label: 'Easy',   color: '#22c55e', bg: '#22c55e15', desc: '3 questions' },
@@ -118,18 +139,26 @@ export default function MockInterview() {
     if (!resumeFile) return;
     setLoading(true);
     try {
-      // Get resume skills from AI service
-      const formData = new FormData();
-      formData.append('file', resumeFile);
-      const resumeRes = await fetch(`${AI_SERVICE_URL}/api/resume/analyze`, {
-        method: 'POST',
-        body: formData
-      });
-      const resumeData = await resumeRes.json();
-      const skills = resumeData.matched_skills || [];
+      // Step 1: Try to get skills from AI service
+      let skills = [];
+      try {
+        const formData = new FormData();
+        formData.append('file', resumeFile);
+        const resumeRes = await fetch(`${AI_SERVICE_URL}/api/resume/analyze`, {
+          method: 'POST',
+          body: formData
+        });
+        if (!resumeRes.ok) throw new Error(`AI service error: ${resumeRes.status}`);
+        const resumeData = await resumeRes.json();
+        skills = resumeData.matched_skills || [];
+      } catch (aiErr) {
+        console.warn('[MockInterview] AI service unavailable, using fallback topics:', aiErr.message);
+        // Fallback: use common skills so interview can still start
+        skills = ['javascript', 'react', 'html', 'css', 'python'];
+      }
       setResumeSkills(skills);
 
-      // Get questions based on skills
+      // Step 2: Get questions from backend based on skills
       const count = DIFFICULTY_CONFIG[difficulty].count;
       const qRes = await API.post('/interview/questions/from-skills', {
         skills,
@@ -147,12 +176,14 @@ export default function MockInterview() {
       setEvaluationError('');
       setInterviewId(`resume-${Date.now()}`);
       setStage('interview');
-    } catch {
-      alert('Failed to analyze resume. Make sure AI service is running.');
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err?.message || 'Unknown error';
+      alert(`Failed to start resume interview: ${msg}`);
     } finally {
       setLoading(false);
     }
   };
+
 
   const goToNextQuestion = async () => {
     if (!currentAnswer.trim()) return;

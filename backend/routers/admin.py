@@ -222,3 +222,70 @@ def add_aptitude_question(req: AddAptitudeRequest, db: Session = Depends(get_db)
         "options": q.options,
         "answer": q.answer
     }}
+
+
+@router.get("/all-interviews")
+def get_all_interviews(db: Session = Depends(get_db), current_admin: dict = Depends(require_admin)):
+    """Return all interviews across all students with student name info."""
+    interviews = (
+        db.query(Interview)
+        .order_by(desc(Interview.created_at))
+        .limit(200)
+        .all()
+    )
+
+    result = []
+    for iv in interviews:
+        student = db.query(User).filter(User.id == iv.user_id).first()
+        result.append({
+            "id": iv.id,
+            "studentName": student.name if student else "Unknown",
+            "studentEmail": student.email if student else "",
+            "topic": iv.topic,
+            "totalScore": iv.total_score,
+            "totalQuestions": iv.total_questions,
+            "completedAt": iv.completed_at,
+            "createdAt": iv.created_at,
+        })
+    return result
+
+
+class AnnounceRequest(BaseModel):
+    title: str
+    message: str
+
+
+@router.post("/announce")
+def send_announcement(req: AnnounceRequest, db: Session = Depends(get_db), current_admin: dict = Depends(require_admin)):
+    """Send a notification to all students."""
+    from services.notification_service import notify
+    students = db.query(User).filter(User.role == "student").all()
+    for student in students:
+        notify(db, student.id, "announcement", req.title, req.message, None)
+    return {"message": f"Announcement sent to {len(students)} students", "count": len(students)}
+
+
+@router.get("/questions/aptitude")
+def get_aptitude_questions(db: Session = Depends(get_db), current_admin: dict = Depends(require_admin)):
+    """List all admin-added aptitude questions."""
+    questions = db.query(AptitudeQuestion).order_by(desc(AptitudeQuestion.id)).all()
+    return [
+        {
+            "id": q.id,
+            "section": q.section,
+            "question": q.question,
+            "options": q.options,
+            "answer": q.answer
+        } for q in questions
+    ]
+
+
+@router.delete("/questions/aptitude/{question_id}")
+def delete_aptitude_question(question_id: int, db: Session = Depends(get_db), current_admin: dict = Depends(require_admin)):
+    """Delete an admin-added aptitude question."""
+    q = db.query(AptitudeQuestion).filter(AptitudeQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+    db.delete(q)
+    db.commit()
+    return {"message": "Question deleted successfully"}

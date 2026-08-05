@@ -51,6 +51,7 @@ export default function Dashboard() {
         </svg>
       ),
       title: 'Skill Verification', desc: 'AI-generated questions to verify claimed skills', accent: '#ea580c', path: '/fakeskill',
+    },
   ];
 
   const adminFeatures = [

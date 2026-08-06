@@ -1,306 +1,4 @@
-// // frontend/src/pages/AdminDashboard.jsx
-
-// import { useEffect, useState } from "react";
-// import API from "../services/api";
-// import {
-//   Chart as ChartJS,
-//   CategoryScale, LinearScale,
-//   BarElement, LineElement, PointElement,
-//   ArcElement, Title, Tooltip, Legend
-// } from "chart.js";
-// import { Bar, Line, Doughnut } from "react-chartjs-2";
-
-// ChartJS.register(
-//   CategoryScale, LinearScale,
-//   BarElement, LineElement, PointElement,
-//   ArcElement, Title, Tooltip, Legend
-// );
-
-// const StatCard = ({ icon, label, value, color }) => (
-//   <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow p-5 border-l-4 ${color}`}>
-//     <p className="text-2xl">{icon}</p>
-//     <p className="text-3xl font-bold text-gray-800 dark:text-white mt-1">{value}</p>
-//     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{label}</p>
-//   </div>
-// );
-
-// export default function AdminDashboard() {
-//   const [stats, setStats]       = useState(null);
-//   const [students, setStudents] = useState([]);
-//   const [loading, setLoading]   = useState(true);
-//   const [error, setError]       = useState("");
-
-//   // Question Upload State
-//   const [qSection, setQSection] = useState('Analytical');
-//   const [qText, setQText]       = useState('');
-//   const [qOpt0, setQOpt0]       = useState('');
-//   const [qOpt1, setQOpt1]       = useState('');
-//   const [qOpt2, setQOpt2]       = useState('');
-//   const [qOpt3, setQOpt3]       = useState('');
-//   const [qAns, setQAns]         = useState(0);
-//   const [qLoading, setQLoading] = useState(false);
-//   const [qMsg, setQMsg]         = useState('');
-
-//   const handleAddQuestion = async (e) => {
-//     e.preventDefault();
-//     setQLoading(true);
-//     setQMsg('');
-//     try {
-//       await API.post("/admin/questions/aptitude", {
-//         section: qSection,
-//         question: qText,
-//         options: [qOpt0, qOpt1, qOpt2, qOpt3],
-//         answer: Number(qAns)
-//       });
-//       setQMsg('Question added successfully!');
-//       setQText(''); setQOpt0(''); setQOpt1(''); setQOpt2(''); setQOpt3(''); setQAns(0);
-//     } catch (err) {
-//       setQMsg(err.response?.data?.message || 'Failed to add question');
-//     }
-//     setQLoading(false);
-//   };
-
-//   useEffect(() => {
-//     Promise.all([
-//       API.get("/admin/stats"),
-//       API.get("/admin/students")
-//     ])
-//       .then(([statsRes, studentsRes]) => {
-//         setStats(statsRes.data);
-//         setStudents(studentsRes.data);
-//       })
-//       .catch(() => setError("Failed to load admin data. Are you logged in as admin?"))
-//       .finally(() => setLoading(false));
-//   }, []);
-
-//   if (loading) return (
-//     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-//       <p className="text-gray-500 dark:text-gray-400 text-lg">⏳ Loading dashboard...</p>
-//     </div>
-//   );
-
-//   if (error) return (
-//     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-//       <p className="text-red-500 text-lg">{error}</p>
-//     </div>
-//   );
-
-//   // Chart data — Topic Bar Chart
-//   const topicChartData = {
-//     labels: stats.topicStats.map((t) => t._id || "Unknown"),
-//     datasets: [{
-//       label: "Interviews per Topic",
-//       data: stats.topicStats.map((t) => t.count),
-//       backgroundColor: [
-//         "#3B82F6", "#10B981", "#F59E0B",
-//         "#EF4444", "#8B5CF6"
-//       ],
-//       borderRadius: 8
-//     }]
-//   };
-
-//   // Chart data — Daily Registrations Line Chart
-//   const lineChartData = {
-//     labels: stats.dailyRegistrations.map((d) => d._id),
-//     datasets: [{
-//       label: "New Students",
-//       data: stats.dailyRegistrations.map((d) => d.count),
-//       borderColor: "#3B82F6",
-//       backgroundColor: "rgba(59,130,246,0.1)",
-//       fill: true,
-//       tension: 0.4,
-//       pointRadius: 5
-//     }]
-//   };
-
-//   // Chart data — Overview Doughnut
-//   const doughnutData = {
-//     labels: ["Resumes Uploaded", "Interviews Taken"],
-//     datasets: [{
-//       data: [stats.totalResumes, stats.totalInterviews],
-//       backgroundColor: ["#10B981", "#3B82F6"],
-//       borderWidth: 0
-//     }]
-//   };
-
-//   const chartOptions = {
-//     responsive: true,
-//     plugins: { legend: { position: "bottom" } }
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-//       <div className="max-w-6xl mx-auto">
-
-//         {/* Header */}
-//         <div className="mb-8">
-//           <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
-//             🛡️ Admin Dashboard
-//           </h1>
-//           <p className="text-gray-500 dark:text-gray-400 mt-1">
-//             SmartHire AI — Student Analytics &amp; Platform Stats
-//           </p>
-//         </div>
-
-//         {/* Stat Cards */}
-//         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-//           <StatCard icon="👥" label="Total Students"     value={stats.totalStudents}   color="border-blue-500"   />
-//           <StatCard icon="📄" label="Resumes Uploaded"   value={stats.totalResumes}    color="border-green-500"  />
-//           <StatCard icon="🎤" label="Interviews Taken"   value={stats.totalInterviews} color="border-yellow-500" />
-//           <StatCard icon="⭐" label="Avg Interview Score" value={`${stats.avgScore}%`} color="border-purple-500" />
-//         </div>
-
-//         {/* Charts Row */}
-//         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-//           {/* Bar Chart */}
-//           <div className="md:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow p-5">
-//             <h2 className="font-semibold text-gray-700 dark:text-gray-200 mb-4">
-//               📊 Interviews by Topic
-//             </h2>
-//             {stats.topicStats.length > 0
-//               ? <Bar data={topicChartData} options={chartOptions} />
-//               : <p className="text-gray-400 text-sm">No interview data yet.</p>
-//             }
-//           </div>
-
-//           {/* Doughnut */}
-//           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-5">
-//             <h2 className="font-semibold text-gray-700 dark:text-gray-200 mb-4">
-//               🍩 Platform Overview
-//             </h2>
-//             <Doughnut data={doughnutData} options={chartOptions} />
-//           </div>
-//         </div>
-
-//         {/* Line Chart */}
-//         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-5 mb-8">
-//           <h2 className="font-semibold text-gray-700 dark:text-gray-200 mb-4">
-//             📈 Student Registrations (Last 7 Days)
-//           </h2>
-//           {stats.dailyRegistrations.length > 0
-//             ? <Line data={lineChartData} options={chartOptions} />
-//             : <p className="text-gray-400 text-sm">No registration data in last 7 days.</p>
-//           }
-//         </div>
-
-//         {/* Students Table */}
-//         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-5 mb-8">
-//           <h2 className="font-semibold text-gray-700 dark:text-gray-200 mb-4">
-//             👥 All Students
-//           </h2>
-//           <div className="overflow-x-auto">
-//             <table className="w-full text-sm">
-//               <thead>
-//                 <tr className="text-left text-gray-500 dark:text-gray-400 border-b dark:border-gray-700">
-//                   <th className="pb-3 pr-4">#</th>
-//                   <th className="pb-3 pr-4">Name</th>
-//                   <th className="pb-3 pr-4">Email</th>
-//                   <th className="pb-3 pr-4">ATS Score</th>
-//                   <th className="pb-3 pr-4">Interviews</th>
-//                   <th className="pb-3 pr-4">Avg Score</th>
-//                   <th className="pb-3">Joined</th>
-//                 </tr>
-//               </thead>
-//               <tbody>
-//                 {students.length === 0 && (
-//                   <tr>
-//                     <td colSpan={7} className="text-gray-400 py-4 text-center">
-//                       No students yet.
-//                     </td>
-//                   </tr>
-//                 )}
-//                 {students.map((s, i) => (
-//                   <tr key={s._id}
-//                       className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-//                     <td className="py-3 pr-4 text-gray-400">{i + 1}</td>
-//                     <td className="py-3 pr-4 font-medium text-gray-800 dark:text-white">{s.name}</td>
-//                     <td className="py-3 pr-4 text-gray-500 dark:text-gray-400">{s.email}</td>
-//                     <td className="py-3 pr-4 text-gray-500 dark:text-gray-400">{s.resumeScore || 'N/A'}</td>
-//                     <td className="py-3 pr-4 text-gray-500 dark:text-gray-400">{s.interviewsTaken || 0}</td>
-//                     <td className="py-3 pr-4 text-gray-500 dark:text-gray-400">{s.avgInterviewScore || 'N/A'}</td>
-//                     <td className="py-3 text-gray-500 dark:text-gray-400">
-//                       {new Date(s.createdAt).toLocaleDateString()}
-//                     </td>
-//                   </tr>
-//                 ))}
-//               </tbody>
-//             </table>
-//           </div>
-//         </div>
-
-//         {/* Upload Question Form */}
-//         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-5 mb-8">
-//           <h2 className="font-semibold text-gray-700 dark:text-gray-200 mb-4">
-//             ➕ Add Aptitude Question
-//           </h2>
-//           {qMsg && (
-//             <div className={`mb-4 px-4 py-2 rounded-xl text-sm ${qMsg.includes('successfully') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-//               {qMsg}
-//             </div>
-//           )}
-//           <form onSubmit={handleAddQuestion} className="space-y-4">
-//             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-//               <div>
-//                 <label className="text-gray-700 dark:text-gray-300 text-sm block mb-1">Section</label>
-//                 <select value={qSection} onChange={e => setQSection(e.target.value)}
-//                   className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500">
-//                   <option value="Analytical">Analytical</option>
-//                   <option value="Logical">Logical</option>
-//                   <option value="Technical">Technical</option>
-//                   <option value="General">General</option>
-//                 </select>
-//               </div>
-//               <div>
-//                 <label className="text-gray-700 dark:text-gray-300 text-sm block mb-1">Question</label>
-//                 <input type="text" value={qText} onChange={e => setQText(e.target.value)} required
-//                   className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500" />
-//               </div>
-//               <div>
-//                 <label className="text-gray-700 dark:text-gray-300 text-sm block mb-1">Option 1</label>
-//                 <input type="text" value={qOpt0} onChange={e => setQOpt0(e.target.value)} required
-//                   className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500" />
-//               </div>
-//               <div>
-//                 <label className="text-gray-700 dark:text-gray-300 text-sm block mb-1">Option 2</label>
-//                 <input type="text" value={qOpt1} onChange={e => setQOpt1(e.target.value)} required
-//                   className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500" />
-//               </div>
-//               <div>
-//                 <label className="text-gray-700 dark:text-gray-300 text-sm block mb-1">Option 3</label>
-//                 <input type="text" value={qOpt2} onChange={e => setQOpt2(e.target.value)} required
-//                   className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500" />
-//               </div>
-//               <div>
-//                 <label className="text-gray-700 dark:text-gray-300 text-sm block mb-1">Option 4</label>
-//                 <input type="text" value={qOpt3} onChange={e => setQOpt3(e.target.value)} required
-//                   className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500" />
-//               </div>
-//               <div>
-//                 <label className="text-gray-700 dark:text-gray-300 text-sm block mb-1">Correct Answer</label>
-//                 <select value={qAns} onChange={e => setQAns(e.target.value)}
-//                   className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500">
-//                   <option value={0}>Option 1</option>
-//                   <option value={1}>Option 2</option>
-//                   <option value={2}>Option 3</option>
-//                   <option value={3}>Option 4</option>
-//                 </select>
-//               </div>
-//             </div>
-//             <button type="submit" disabled={qLoading}
-//               className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50">
-//               {qLoading ? 'Adding...' : 'Add Question'}
-//             </button>
-//           </form>
-//         </div>
-
-//       </div>
-//     </div>
-//   );
-// }
-
-
-
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Chart as ChartJS,
@@ -311,80 +9,148 @@ import {
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import API from '../services/api';
 
-ChartJS.register(
-  CategoryScale, LinearScale, BarElement,
-  LineElement, PointElement, ArcElement,
-  Title, Tooltip, Legend
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend);
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetail, setStudentDetail] = useState(null);
-
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  const [allInterviews, setAllInterviews] = useState([]);
+  const [ivLoading, setIvLoading] = useState(false);
+  const [ivSearch, setIvSearch] = useState('');
+  
+  const [questions, setQuestions] = useState([]);
+  const [qLoading, setQLoading] = useState(false);
+  const [qMsg, setQMsg] = useState('');
+  const [qSection, setQSection] = useState('Analytical');
+  const [qText, setQText] = useState('');
+  const [qOpts, setQOpts] = useState(['','','','']);
+  const [qAns, setQAns] = useState(0);
+  
+  const [annTitle, setAnnTitle] = useState('');
+  const [annMsg, setAnnMsg] = useState('');
+  const [annLoading, setAnnLoading] = useState(false);
+  const [annResult, setAnnResult] = useState('');
 
   useEffect(() => {
-    if (user.role !== 'admin') {
-      navigate('/dashboard');
-      return;
-    }
-    fetchData();
+    if (user.role !== 'admin') { navigate('/dashboard'); return; }
+    fetchMain();
   }, []);
 
-  const fetchData = async () => {
+  const fetchMain = async () => {
     setLoading(true);
     try {
-      const [statsRes, studentsRes] = await Promise.all([
-        API.get('/admin/stats'),
-        API.get('/admin/students')
-      ]);
-      setStats(statsRes.data);
-      setStudents(studentsRes.data);
-    } catch (error) {
-      console.error('Failed to fetch admin data:', error);
-    } finally {
-      setLoading(false);
-    }
+      const [sRes, stuRes] = await Promise.all([API.get('/admin/stats'), API.get('/admin/students')]);
+      setStats(sRes.data);
+      setStudents(stuRes.data);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
-  const fetchStudentDetail = async (studentId) => {
+  const fetchStudentDetail = async (id) => {
     try {
-      const res = await API.get(`/admin/students/${studentId}`);
+      const res = await API.get(`/admin/students/${id}`);
       setStudentDetail(res.data);
-      setSelectedStudent(studentId);
-    } catch (error) {
-      console.error('Failed to fetch student detail:', error);
+      setSelectedStudent(id);
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchInterviews = async () => {
+    setIvLoading(true);
+    try {
+      const res = await API.get('/admin/all-interviews');
+      setAllInterviews(res.data);
+    } catch (e) { console.error(e); }
+    finally { setIvLoading(false); }
+  };
+
+  const fetchQuestions = async () => {
+    setQLoading(true);
+    try {
+      const res = await API.get('/admin/questions/aptitude');
+      setQuestions(res.data);
+    } catch (e) { console.error(e); }
+    finally { setQLoading(false); }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'interviews' && allInterviews.length === 0) fetchInterviews();
+    if (activeTab === 'questions' && questions.length === 0) fetchQuestions();
+  }, [activeTab]);
+
+  const handleAddQuestion = async (e) => {
+    e.preventDefault();
+    setQLoading(true); setQMsg('');
+    try {
+      await API.post('/admin/questions/aptitude', {
+        section: qSection,
+        question: qText,
+        options: qOpts,
+        answer: Number(qAns)
+      });
+      setQMsg('Question added successfully!');
+      setQText(''); setQOpts(['','','','']); setQAns(0);
+      fetchQuestions();
+    } catch (err) {
+      setQMsg('Failed: ' + (err.response?.data?.detail || 'error'));
     }
+    setQLoading(false);
+  };
+
+  const handleDeleteQuestion = async (id) => {
+    if (!window.confirm('Delete this question?')) return;
+    try {
+      await API.delete(`/admin/questions/aptitude/${id}`);
+      setQuestions(q => q.filter(x => x.id !== id));
+    } catch (e) { alert('Delete failed'); }
+  };
+
+  const handleAnnounce = async (e) => {
+    e.preventDefault();
+    setAnnLoading(true); setAnnResult('');
+    try {
+      const res = await API.post('/admin/announce', { title: annTitle, message: annMsg });
+      setAnnResult(`Sent to ${res.data.count} students!`);
+      setAnnTitle(''); setAnnMsg('');
+    } catch {
+      setAnnResult('Failed to send announcement');
+    }
+    setAnnLoading(false);
   };
 
   const filteredStudents = students.filter(s =>
     s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  
+  const filteredInterviews = allInterviews.filter(iv =>
+    iv.studentName?.toLowerCase().includes(ivSearch.toLowerCase()) ||
+    iv.topic?.toLowerCase().includes(ivSearch.toLowerCase())
+  );
 
-  // Chart data
   const monthlyChartData = {
-    labels: stats?.monthlyData?.map(d =>
-      `${MONTH_NAMES[d._id.month - 1]} ${d._id.year}`
-    ) || [],
+    labels: stats?.monthlyData?.map(d => `${MONTH_NAMES[d._id.month - 1]} ${d._id.year}`) || [],
     datasets: [{
       label: 'New Students',
       data: stats?.monthlyData?.map(d => d.count) || [],
-      backgroundColor: 'rgba(255,255,255,0.08)',
-      borderColor: '#B0B0B0',
+      backgroundColor: 'rgba(59,130,246,0.15)',
+      borderColor: '#3b82f6',
       borderWidth: 2,
       tension: 0.4,
       fill: true,
-      pointBackgroundColor: '#FFFFFF',
-      pointRadius: 5,
+      pointBackgroundColor: '#3b82f6',
+      pointRadius: 5
     }]
   };
 
@@ -392,434 +158,341 @@ export default function AdminDashboard() {
     labels: stats?.topicData?.map(d => d._id) || [],
     datasets: [{
       data: stats?.topicData?.map(d => d.count) || [],
-      backgroundColor: [
-        '#FFFFFF', '#B0B0B0', '#707070',
-        '#3D3D3D', '#FFFFFF', '#B0B0B0', '#707070'
-      ],
-      borderWidth: 0,
+      backgroundColor: ['#3b82f6','#a855f7','#22c55e','#f59e0b','#ef4444','#14b8a6','#f97316'],
+      borderWidth: 0
     }]
   };
 
   const atsChartData = {
-    labels: ['0-25 (Low)', '25-50 (Avg)', '50-75 (Good)', '75-100 (Great)'],
+    labels: ['0-25 (Low)', '25-50 (Fair)', '50-75 (Good)', '75-100 (Great)'],
     datasets: [{
       label: 'Students',
-      data: stats?.atsDistribution?.map(d => d.count) || [0, 0, 0, 0],
-      backgroundColor: ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0.18)', 'rgba(255,255,255,0.28)'],
-      borderColor: ['#3D3D3D', '#707070', '#B0B0B0', '#FFFFFF'],
+      data: stats?.atsDistribution?.map(d => d.count) || [0,0,0,0],
+      backgroundColor: ['rgba(239,68,68,0.2)','rgba(245,158,11,0.2)','rgba(59,130,246,0.2)','rgba(34,197,94,0.2)'],
+      borderColor: ['#ef4444','#f59e0b','#3b82f6','#22c55e'],
       borderWidth: 2,
-      borderRadius: 8,
+      borderRadius: 8
     }]
   };
 
-  const tooltipPlugin = {
-    backgroundColor: '#1f2937',
-    borderColor: '#374151',
-    borderWidth: 1,
-    cornerRadius: 10,
-    titleFont: { family: 'Sora, sans-serif', size: 12, weight: '600' },
-    bodyFont: { family: 'Inter, sans-serif', size: 11 },
-    padding: 10,
-  };
-
-  const chartOptions = {
+  const chartOpts = {
     responsive: true,
     plugins: {
       legend: { display: false },
-      tooltip: tooltipPlugin,
+      tooltip: {
+        backgroundColor: '#111827', borderColor: '#1f2937', borderWidth: 1, padding: 10,
+        titleFont: { family: 'Sora, sans-serif', size: 12, weight: '600' },
+        bodyFont: { family: 'Inter, sans-serif', size: 11 }
+      }
     },
     scales: {
-      x: {
-        grid: { color: '#1f2937' },
-        ticks: { color: '#6b7280', font: { family: 'Inter, sans-serif', size: 11 } }
-      },
-      y: {
-        grid: { color: '#1f2937' },
-        ticks: { color: '#6b7280', font: { family: 'Inter, sans-serif', size: 11 } }
-      }
+      x: { grid: { color: 'rgba(75,85,99,0.15)' }, ticks: { color: '#6b7280', font: { family: 'Inter', size: 11 } } },
+      y: { grid: { color: 'rgba(75,85,99,0.15)' }, ticks: { color: '#6b7280', font: { family: 'Inter', size: 11 } } }
     }
   };
 
-  const doughnutOptions = {
-    responsive: true,
-    cutout: '68%',
+  const dOpts = {
+    responsive: true, cutout: '65%',
     plugins: {
-      tooltip: tooltipPlugin,
-      legend: {
-        position: 'bottom',
-        labels: { color: '#6b7280', padding: 14, font: { family: 'Inter, sans-serif', size: 11 } }
-      }
+      tooltip: { backgroundColor: '#111827', padding: 10 },
+      legend: { position: 'bottom', labels: { color: '#6b7280', padding: 14, font: { family: 'Inter', size: 11 } } }
     }
   };
+
+  const sc = s => s >= 7 ? '#22c55e' : s >= 4 ? '#f59e0b' : '#ef4444';
+  const tabEmoji = { overview: '📊', students: '👥', analytics: '📈', interviews: '🎤', questions: '❓', announce: '📢' };
+
+  const Card = ({ children, className = '' }) => (
+    <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl ${className}`}
+      style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+      {children}
+    </div>
+  );
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-950">
       <div className="text-center">
         <svg className="animate-spin h-8 w-8 mx-auto mb-3 text-blue-500" viewBox="0 0 24 24" fill="none">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
         </svg>
-        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 14 }} className="text-gray-500 dark:text-gray-400">Loading analytics...</p>
+        <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 14 }} className="text-gray-500 dark:text-gray-400">Loading admin dashboard...</p>
       </div>
     </div>
   );
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-    <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-6">
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 style={{ fontFamily: 'Sora, sans-serif', fontSize: 28, fontWeight: 700, lineHeight: 1.25, letterSpacing: '-0.01em' }}
-          className="text-gray-900 dark:text-white mb-1">
-          Admin Dashboard
-        </h1>
-        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 14.5 }} className="text-gray-500 dark:text-gray-400">
-          Platform analytics and student performance overview
-        </p>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 mb-8 p-1 rounded-xl w-fit bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-        {['overview', 'students', 'analytics', 'bulk screening', 'skill detection'].map(tab => (
-          <button key={tab} onClick={() => {
-            if (tab === 'bulk screening') navigate('/bulk-screening');
-            else if (tab === 'skill detection') navigate('/fakeskill');
-            else setActiveTab(tab);
-          }}
-            className="px-4 py-2 rounded-lg capitalize transition-all"
-            style={{
-              fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500,
-              backgroundColor: activeTab === tab ? 'white' : 'transparent',
-              color: activeTab === tab ? '#111827' : '#6b7280',
-              boxShadow: activeTab === tab ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
-            }}>
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {/* ── OVERVIEW TAB ── */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'Total Students', value: stats?.totalStudents || 0, color: '#3b82f6', icon: (<svg width="20" height="20" fill="none" stroke="#3b82f6" strokeWidth="1.75" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>) },
-              { label: 'Resumes Analyzed', value: stats?.totalResumes || 0, color: '#22c55e', icon: (<svg width="20" height="20" fill="none" stroke="#22c55e" strokeWidth="1.75" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>) },
-              { label: 'Interviews Done', value: stats?.totalInterviews || 0, color: '#a855f7', icon: (<svg width="20" height="20" fill="none" stroke="#a855f7" strokeWidth="1.75" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>) },
-              { label: 'Avg ATS Score', value: `${stats?.avgATS || 0}%`, color: '#f59e0b', icon: (<svg width="20" height="20" fill="none" stroke="#f59e0b" strokeWidth="1.75" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>) },
-            ].map((stat, i) => (
-              <div key={i}
-                className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 transition-all duration-200"
-                style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.15), 0 8px 24px -12px rgba(0,0,0,0.25)' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.2), 0 16px 32px -12px rgba(0,0,0,0.35)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.15), 0 8px 24px -12px rgba(0,0,0,0.25)'; }}
-              >
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-                  style={{ background: `linear-gradient(135deg, ${stat.color}25, ${stat.color}0a)`, border: `1px solid ${stat.color}30` }}>
-                  {stat.icon}
-                </div>
-                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 34, fontWeight: 600, letterSpacing: '-0.01em', color: stat.color, lineHeight: 1.1, marginBottom: 4 }}>
-                  {stat.value}
-                </div>
-                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 500 }} className="text-gray-500 dark:text-gray-400">{stat.label}</div>
-              </div>
-            ))}
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 28, fontWeight: 700, lineHeight: 1.25, letterSpacing: '-0.01em' }}
+              className="text-gray-900 dark:text-white mb-1">Admin Dashboard</h1>
+            <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 14.5 }} className="text-gray-500 dark:text-gray-400">
+              Platform management & analytics — SmartHire AI
+            </p>
           </div>
-
-          {/* Charts row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-            {/* Monthly registrations */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
-              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
-                className="text-gray-900 dark:text-white mb-4">
-                Student Registrations (Monthly)
-              </h3>
-              {stats?.monthlyData?.length > 0 ? (
-                <Line data={monthlyChartData} options={chartOptions} />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-40 gap-2">
-                  <svg width="32" height="32" fill="none" stroke="#4b5563" strokeWidth="1.5" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                  <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }} className="text-gray-400">No registration data yet</p>
-                </div>
-              )}
-            </div>
-
-            {/* Interview topics */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
-              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
-                className="text-gray-900 dark:text-white mb-4">
-                Interview Topics Distribution
-              </h3>
-              {stats?.topicData?.length > 0 ? (
-                <Doughnut data={topicChartData} options={doughnutOptions} />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-40 gap-2">
-                  <svg width="32" height="32" fill="none" stroke="#4b5563" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-                  <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }} className="text-gray-400">No interviews yet</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ATS Distribution */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
-            style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
-              className="text-gray-900 dark:text-white mb-4">
-              ATS Score Distribution
-            </h3>
-            <Bar data={atsChartData} options={chartOptions} />
-          </div>
-
-          {/* Performance summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
-              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
-                className="text-gray-900 dark:text-white mb-4">
-                Platform Summary
-              </h3>
-              <div className="space-y-4">
-                {[
-                  { label: 'Avg Resume ATS Score', value: `${stats?.avgATS || 0}/100`, color: '#3b82f6', pct: stats?.avgATS || 0 },
-                  { label: 'Avg Interview Score', value: `${stats?.avgInterview || 0}/10`, color: '#a855f7', pct: (stats?.avgInterview || 0) * 10 },
-                ].map((item, i) => (
-                  <div key={i}>
-                    <div className="flex justify-between mb-1.5">
-                      <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }} className="text-gray-500 dark:text-gray-400">{item.label}</span>
-                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: item.color }}>{item.value}</span>
-                    </div>
-                    <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full">
-                      <div className="h-1.5 rounded-full transition-all duration-700"
-                        style={{ width: `${item.pct}%`, backgroundColor: item.color }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent students */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
-              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
-                className="text-gray-900 dark:text-white mb-4">
-                Recent Registrations
-              </h3>
-              <div className="space-y-3">
-                {students.slice(0, 5).map((s, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 text-xs font-bold flex-shrink-0">
-                      {s.name?.charAt(0)?.toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-white truncate">{s.name}</p>
-                      <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 12 }} className="text-gray-400 truncate">{s.email}</p>
-                    </div>
-                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12 }} className="text-gray-400">
-                      {new Date(s.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                ))}
-                {students.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-6 gap-2">
-                    <svg width="28" height="28" fill="none" stroke="#4b5563" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }} className="text-gray-400">No students yet</p>
-                  </div>
-                )}
-              </div>
-            </div>
+          <div className="flex gap-2">
+            <button onClick={() => navigate('/bulk-screening')}
+              className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#3b82f620', color: '#3b82f6', border: '1px solid #3b82f630' }}>
+              📋 Bulk Screening
+            </button>
+            <button onClick={fetchMain}
+              className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#a855f720', color: '#a855f7', border: '1px solid #a855f730' }}>
+              🔄 Refresh
+            </button>
           </div>
         </div>
-      )}
 
-      {/* ── STUDENTS TAB ── */}
-      {activeTab === 'students' && (
-        <div className="space-y-4">
+        {/* Tab Bar */}
+        <div className="flex flex-wrap gap-1.5 mb-6 p-1.5 rounded-2xl w-fit bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
+          style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }}>
+          {['overview', 'students', 'analytics', 'interviews', 'questions', 'announce'].map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all text-sm font-medium capitalize"
+              style={{
+                fontFamily: 'Inter,sans-serif',
+                backgroundColor: activeTab === tab ? '#3b82f6' : 'transparent',
+                color: activeTab === tab ? 'white' : '#6b7280',
+                boxShadow: activeTab === tab ? '0 2px 8px rgba(59,130,246,0.3)' : 'none',
+              }}>
+              <span>{tabEmoji[tab]}</span> {tab}
+            </button>
+          ))}
+        </div>
 
-          {/* Search */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 flex gap-3">
-            <div className="flex-1 relative">
-              <svg width="16" height="16" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"
-                className="absolute left-3 top-1/2 -translate-y-1/2">
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input type="text" value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search students by name or email..."
-                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="text-xs text-gray-400 flex items-center">
-              {filteredStudents.length} students
-            </div>
-          </div>
-
-          {/* Students table */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden"
-            style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-            <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700">
-              {['Student', 'Email', 'Joined', 'Action'].map((h, i) => (
-                <div key={h} className={`${i === 0 ? 'col-span-4' : i === 1 ? 'col-span-3' : i === 2 ? 'col-span-2' : 'col-span-3'}`}
-                  style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}
-                  className={`${i === 0 ? 'col-span-4' : i === 1 ? 'col-span-3' : i === 2 ? 'col-span-2' : 'col-span-3'} text-gray-500 dark:text-gray-400`}>
-                  {h}
+        {/* OVERVIEW */}
+        {activeTab === 'overview' && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Total Students', value: stats?.totalStudents || 0, color: '#3b82f6' },
+                { label: 'Resumes Analyzed', value: stats?.totalResumes || 0, color: '#22c55e' },
+                { label: 'Interviews Done', value: stats?.totalInterviews || 0, color: '#a855f7' },
+                { label: 'Avg ATS Score', value: `${stats?.avgATS || 0}%`, color: '#f59e0b' },
+              ].map((s, i) => (
+                <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 transition-all duration-200"
+                  style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)', borderTop: `4px solid ${s.color}` }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                  <div style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 32, fontWeight: 600, color: s.color, lineHeight: 1.1, marginBottom: 4 }}>{s.value}</div>
+                  <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, fontWeight: 500 }} className="text-gray-500 dark:text-gray-400">{s.label}</div>
                 </div>
               ))}
             </div>
 
-            {filteredStudents.length === 0 ? (
-              <div className="py-12 flex flex-col items-center gap-2">
-                <svg width="32" height="32" fill="none" stroke="#4b5563" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }} className="text-gray-400">No students found</p>
+            <Card className="p-5">
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white mb-4">Quick Actions</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'View All Students', emoji: '👥', tab: 'students', color: '#3b82f6' },
+                  { label: 'Interview Reports', emoji: '🎤', tab: 'interviews', color: '#a855f7' },
+                  { label: 'Add Questions', emoji: '❓', tab: 'questions', color: '#f59e0b' },
+                  { label: 'Announce to All', emoji: '📢', tab: 'announce', color: '#22c55e' },
+                ].map((a, i) => (
+                  <button key={i} onClick={() => setActiveTab(a.tab)}
+                    className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all"
+                    style={{ borderColor: `${a.color}30`, backgroundColor: `${a.color}08` }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = `${a.color}60`; e.currentTarget.style.backgroundColor = `${a.color}18`; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = `${a.color}30`; e.currentTarget.style.backgroundColor = `${a.color}08`; }}>
+                    <span style={{ fontSize: 24 }}>{a.emoji}</span>
+                    <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, color: a.color }}>{a.label}</span>
+                  </button>
+                ))}
               </div>
-            ) : (
-              filteredStudents.map((student, i) => (
-                <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
-                  <div className="col-span-4 flex items-center gap-3">
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="p-6">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white mb-4">Monthly Registrations</h3>
+                {stats?.monthlyData?.length > 0
+                  ? <Line data={monthlyChartData} options={chartOpts} />
+                  : <div className="h-40 flex items-center justify-center text-gray-400" style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }}>No data yet</div>}
+              </Card>
+              <Card className="p-6">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white mb-4">Interview Topics</h3>
+                {stats?.topicData?.length > 0
+                  ? <Doughnut data={topicChartData} options={dOpts} />
+                  : <div className="h-40 flex items-center justify-center text-gray-400" style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }}>No interviews yet</div>}
+              </Card>
+            </div>
+
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white">Recent Registrations</h3>
+                <button onClick={() => setActiveTab('students')} style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, color: '#3b82f6', fontWeight: 500 }}>View all →</button>
+              </div>
+              <div className="space-y-2">
+                {students.slice(0, 5).map((s, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+                    onClick={() => { fetchStudentDetail(s.id); setActiveTab('students'); }}>
                     <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 text-xs font-bold flex-shrink-0">
-                      {student.name?.charAt(0)?.toUpperCase()}
+                      {s.name?.charAt(0)?.toUpperCase()}
                     </div>
-                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 500 }}
-                      className="text-gray-900 dark:text-white truncate">{student.name}</span>
+                    <div className="flex-1 min-w-0">
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-white truncate">{s.name}</p>
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-400 truncate">{s.email}</p>
+                    </div>
+                    <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-400 flex-shrink-0">{new Date(s.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <div className="col-span-3 flex items-center">
-                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}
-                      className="text-gray-500 dark:text-gray-400 truncate">{student.email}</span>
+                ))}
+                {students.length === 0 && (
+                  <div className="py-8 text-center text-gray-400" style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }}>No students yet</div>
+                )}
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white mb-4">Platform Performance</h3>
+              <div className="space-y-4">
+                {[
+                  { label: 'Avg Resume ATS Score', value: `${stats?.avgATS || 0}/100`, pct: stats?.avgATS || 0, color: '#3b82f6' },
+                  { label: 'Avg Interview Score', value: `${stats?.avgInterview || 0}/10`, pct: (stats?.avgInterview || 0) * 10, color: '#a855f7' },
+                ].map((item, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between mb-1.5">
+                      <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }} className="text-gray-500 dark:text-gray-400">{item.label}</span>
+                      <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 13, fontWeight: 600, color: item.color }}>{item.value}</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full">
+                      <div className="h-2 rounded-full transition-all duration-700" style={{ width: `${item.pct}%`, backgroundColor: item.color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* STUDENTS */}
+        {activeTab === 'students' && (
+          <div className="space-y-4">
+            <Card className="p-4">
+              <div className="flex gap-3 items-center">
+                <div className="flex-1 relative">
+                  <svg width="16" height="16" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2">
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search students by name or email..."
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                    style={{ fontFamily: 'Inter,sans-serif' }} />
+                </div>
+                <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }} className="text-gray-400 flex-shrink-0">{filteredStudents.length}/{students.length}</span>
+              </div>
+            </Card>
+
+            <Card className="overflow-hidden">
+              <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 grid grid-cols-12 gap-4">
+                {[['Name', 5], ['Email', 4], ['Joined', 2], ['Action', 1]].map(([h, c]) => (
+                  <div key={h} className={`col-span-${c} text-gray-500 dark:text-gray-400`}
+                    style={{ fontFamily: 'Inter,sans-serif', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                ))}
+              </div>
+              {filteredStudents.length === 0 ? (
+                <div className="py-16 text-center text-gray-400" style={{ fontFamily: 'Inter,sans-serif', fontSize: 14 }}>👥 No students found</div>
+              ) : filteredStudents.map((s, i) => (
+                <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                  <div className="col-span-5 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 text-xs font-bold flex-shrink-0">{s.name?.charAt(0)?.toUpperCase()}</div>
+                    <div className="min-w-0">
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-white truncate">{s.name}</p>
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 11 }} className="text-gray-400">Interviews: {s.interviewsTaken || 0}</p>
+                    </div>
+                  </div>
+                  <div className="col-span-4 flex items-center">
+                    <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }} className="text-gray-500 dark:text-gray-400 truncate">{s.email}</span>
                   </div>
                   <div className="col-span-2 flex items-center">
-                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12 }} className="text-gray-500 dark:text-gray-400">
-                      {new Date(student.createdAt).toLocaleDateString()}
-                    </span>
+                    <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-400">{new Date(s.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <div className="col-span-3 flex items-center">
-                    <button onClick={() => fetchStudentDetail(student._id)}
-                      className="text-xs px-3 py-1.5 rounded-lg transition-colors font-medium"
-                      style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#3b82f620', color: '#3b82f6' }}>
-                      View Details →
-                    </button>
+                  <div className="col-span-1 flex items-center">
+                    <button onClick={() => fetchStudentDetail(s.id)}
+                      className="text-xs px-2 py-1.5 rounded-lg font-medium transition-colors"
+                      style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#3b82f620', color: '#3b82f6' }}>View</button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </Card>
 
-          {/* Student detail modal */}
-          {selectedStudent && studentDetail && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-              style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-              <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-y-auto"
-                style={{ maxHeight: '85vh' }}>
-
-                {/* Modal header */}
-                <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 font-bold">
-                      {studentDetail.student?.name?.charAt(0)?.toUpperCase()}
+            {/* Student Detail Modal */}
+            {selectedStudent && studentDetail && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+                <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
+                  style={{ maxHeight: '85vh' }}>
+                  <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 font-bold text-lg">
+                        {studentDetail.student?.name?.charAt(0)?.toUpperCase()}
+                      </div>
+                      <div>
+                        <h2 style={{ fontFamily: 'Sora,sans-serif', fontWeight: 600 }} className="text-gray-900 dark:text-white">{studentDetail.student?.name}</h2>
+                        <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-400">{studentDetail.student?.email}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => { setSelectedStudent(null); setStudentDetail(null); }}
+                      className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">✕</button>
+                  </div>
+                  <div className="p-6 overflow-y-auto space-y-5">
+                    <div>
+                      <h3 style={{ fontFamily: 'Sora,sans-serif', fontWeight: 600, fontSize: 14 }} className="text-gray-900 dark:text-white mb-3">
+                        📄 Resume History ({studentDetail.resumes?.length || 0})
+                      </h3>
+                      {studentDetail.resumes?.length > 0 ? studentDetail.resumes.map((r, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl mb-2">
+                          <div>
+                            <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-white">{r.fileName || 'Resume'}</p>
+                            <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-400">{new Date(r.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 14, fontWeight: 700, color: r.atsScore >= 70 ? '#22c55e' : r.atsScore >= 40 ? '#f59e0b' : '#ef4444' }}>
+                            ATS: {r.atsScore}%
+                          </span>
+                        </div>
+                      )) : <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }} className="text-gray-400">No resumes yet</p>}
                     </div>
                     <div>
-                      <h2 className="font-semibold text-gray-900 dark:text-white">
-                        {studentDetail.student?.name}
-                      </h2>
-                      <p className="text-gray-400 text-xs">{studentDetail.student?.email}</p>
+                      <h3 style={{ fontFamily: 'Sora,sans-serif', fontWeight: 600, fontSize: 14 }} className="text-gray-900 dark:text-white mb-3">
+                        🎤 Interview History ({studentDetail.interviews?.length || 0})
+                      </h3>
+                      {studentDetail.interviews?.length > 0 ? studentDetail.interviews.map((iv, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl mb-2">
+                          <div>
+                            <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, fontWeight: 500 }} className="capitalize text-gray-900 dark:text-white">{iv.topic} Interview</p>
+                            <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-400">{new Date(iv.createdAt).toLocaleDateString()} · {iv.totalQuestions} Qs</p>
+                          </div>
+                          <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 14, fontWeight: 700, color: sc(iv.totalScore) }}>{iv.totalScore}/10</span>
+                        </div>
+                      )) : <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }} className="text-gray-400">No interviews yet</p>}
                     </div>
-                  </div>
-                  <button onClick={() => { setSelectedStudent(null); setStudentDetail(null); }}
-                    className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500">
-                    ✕
-                  </button>
-                </div>
-
-                <div className="p-6 space-y-4">
-
-                  {/* Resume history */}
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
-                      Resume History ({studentDetail.resumes?.length || 0})
-                    </h3>
-                    {studentDetail.resumes?.length > 0 ? (
-                      <div className="space-y-2">
-                        {studentDetail.resumes.map((r, i) => (
-                          <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                            <div>
-                              <p className="text-gray-900 dark:text-white text-sm">{r.fileName || 'Resume'}</p>
-                              <p className="text-gray-400 text-xs">{new Date(r.createdAt).toLocaleDateString()}</p>
-                            </div>
-                            <span className="text-sm font-bold"
-                              style={{ color: r.atsScore >= 70 ? '#22c55e' : r.atsScore >= 40 ? '#f59e0b' : '#ef4444' }}>
-                              ATS: {r.atsScore}%
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-400 text-sm">No resumes analyzed yet</p>
-                    )}
-                  </div>
-
-                  {/* Interview history */}
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
-                      Interview History ({studentDetail.interviews?.length || 0})
-                    </h3>
-                    {studentDetail.interviews?.length > 0 ? (
-                      <div className="space-y-2">
-                        {studentDetail.interviews.map((iv, i) => (
-                          <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                            <div>
-                              <p className="text-gray-900 dark:text-white text-sm capitalize">{iv.topic} Interview</p>
-                              <p className="text-gray-400 text-xs">{new Date(iv.createdAt).toLocaleDateString()}</p>
-                            </div>
-                            <span className="text-sm font-bold"
-                              style={{ color: iv.totalScore >= 7 ? '#22c55e' : iv.totalScore >= 4 ? '#f59e0b' : '#ef4444' }}>
-                              {iv.totalScore}/10
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-400 text-sm">No interviews taken yet</p>
-                    )}
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── ANALYTICS TAB ── */}
-      {activeTab === 'analytics' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
-              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
-                className="text-gray-900 dark:text-white mb-4">Monthly Growth</h3>
-              <Line data={monthlyChartData} options={chartOptions} />
-            </div>
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
-              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
-                className="text-gray-900 dark:text-white mb-4">Interview Topics</h3>
-              <Doughnut data={topicChartData} options={doughnutOptions} />
-            </div>
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 md:col-span-2"
-              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
-                className="text-gray-900 dark:text-white mb-4">ATS Score Distribution</h3>
-              <Bar data={atsChartData} options={chartOptions} />
-            </div>
+            )}
           </div>
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6"
-            style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}
-              className="text-gray-900 dark:text-white mb-4">Platform Statistics</h3>
+        )}
+
+        {/* ANALYTICS */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="p-6">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white mb-4">Monthly Growth</h3>
+                <Line data={monthlyChartData} options={chartOpts} />
+              </Card>
+              <Card className="p-6">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white mb-4">Interview Topics</h3>
+                <Doughnut data={topicChartData} options={dOpts} />
+              </Card>
+              <Card className="p-6 md:col-span-2">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white mb-4">ATS Score Distribution</h3>
+                <Bar data={atsChartData} options={chartOpts} />
+              </Card>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: 'Total Students', value: stats?.totalStudents || 0, color: '#3b82f6' },
@@ -827,18 +500,212 @@ export default function AdminDashboard() {
                 { label: 'Interviews Done', value: stats?.totalInterviews || 0, color: '#a855f7' },
                 { label: 'Avg ATS Score', value: `${stats?.avgATS || 0}%`, color: '#f59e0b' },
               ].map((item, i) => (
-                <div key={i} className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
-                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 28, fontWeight: 600, letterSpacing: '-0.01em', color: item.color, marginBottom: 4 }}>
-                    {item.value}
-                  </div>
-                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 12 }} className="text-gray-400">{item.label}</div>
-                </div>
+                <Card key={i} className="text-center p-4">
+                  <div style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 28, fontWeight: 600, color: item.color, marginBottom: 4 }}>{item.value}</div>
+                  <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-400">{item.label}</div>
+                </Card>
               ))}
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* INTERVIEWS */}
+        {activeTab === 'interviews' && (
+          <div className="space-y-4">
+            <Card className="p-4">
+              <div className="flex gap-3 items-center">
+                <div className="flex-1 relative">
+                  <svg width="16" height="16" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2">
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input type="text" value={ivSearch} onChange={e => setIvSearch(e.target.value)}
+                    placeholder="Search by student or topic..."
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition-colors"
+                    style={{ fontFamily: 'Inter,sans-serif' }} />
+                </div>
+                <span style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }} className="text-gray-400 flex-shrink-0">{filteredInterviews.length} records</span>
+              </div>
+            </Card>
+            <Card className="overflow-hidden">
+              <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700 grid grid-cols-12 gap-3">
+                {['Student', 'Topic', 'Qs', 'Score', 'Date'].map((h, i) => (
+                  <div key={h} className={[`col-span-4`, `col-span-3`, `col-span-2`, `col-span-2`, `col-span-1`][i] + ` text-gray-500 dark:text-gray-400`}
+                    style={{ fontFamily: 'Inter,sans-serif', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                ))}
+              </div>
+              {ivLoading ? (
+                <div className="py-16 flex justify-center">
+                  <svg className="animate-spin h-6 w-6 text-purple-500" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                </div>
+              ) : filteredInterviews.length === 0 ? (
+                <div className="py-16 text-center text-gray-400" style={{ fontFamily: 'Inter,sans-serif', fontSize: 14 }}>🎤 No interviews found</div>
+              ) : filteredInterviews.map((iv, i) => (
+                <div key={i} className="grid grid-cols-12 gap-3 px-6 py-4 border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                  <div className="col-span-4 flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-500 text-xs font-bold flex-shrink-0">{iv.studentName?.charAt(0)?.toUpperCase()}</div>
+                    <div className="min-w-0">
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-white truncate">{iv.studentName}</p>
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 11 }} className="text-gray-400 truncate">{iv.studentEmail}</p>
+                    </div>
+                  </div>
+                  <div className="col-span-3 flex items-center">
+                    <span className="px-2 py-1 rounded-md text-xs font-medium capitalize"
+                      style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#a855f720', color: '#a855f7' }}>{iv.topic}</span>
+                  </div>
+                  <div className="col-span-2 flex items-center"><span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 13 }} className="text-gray-600 dark:text-gray-300">{iv.totalQuestions}</span></div>
+                  <div className="col-span-2 flex items-center"><span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 14, fontWeight: 700, color: sc(iv.totalScore) }}>{iv.totalScore}/10</span></div>
+                  <div className="col-span-1 flex items-center"><span style={{ fontFamily: 'Inter,sans-serif', fontSize: 11 }} className="text-gray-400">{iv.createdAt ? new Date(iv.createdAt).toLocaleDateString() : '—'}</span></div>
+                </div>
+              ))}
+            </Card>
+          </div>
+        )}
+
+        {/* QUESTIONS */}
+        {activeTab === 'questions' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Card className="p-6">
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white mb-5">➕ Add Aptitude Question</h3>
+              {qMsg && (
+                <div className={`mb-4 px-4 py-2.5 rounded-xl text-sm ${qMsg.includes('success') ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}
+                  style={{ fontFamily: 'Inter,sans-serif' }}>{qMsg}</div>
+              )}
+              <form onSubmit={handleAddQuestion} className="space-y-4">
+                <div>
+                  <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Section</label>
+                  <select value={qSection} onChange={e => setQSection(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-yellow-500"
+                    style={{ fontFamily: 'Inter,sans-serif' }}>
+                    {['Analytical', 'Logical', 'Technical', 'Verbal', 'Quantitative'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Question</label>
+                  <textarea value={qText} onChange={e => setQText(e.target.value)} required rows={3} placeholder="Enter your question..."
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-yellow-500 resize-none"
+                    style={{ fontFamily: 'Inter,sans-serif' }} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {['Option A', 'Option B', 'Option C', 'Option D'].map((label, i) => (
+                    <div key={i}>
+                      <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">{label}</label>
+                      <input type="text" value={qOpts[i]} onChange={e => { const o = [...qOpts]; o[i] = e.target.value; setQOpts(o); }} required placeholder={label}
+                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-500"
+                        style={{ fontFamily: 'Inter,sans-serif' }} />
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Correct Answer</label>
+                  <select value={qAns} onChange={e => setQAns(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-yellow-500"
+                    style={{ fontFamily: 'Inter,sans-serif' }}>
+                    {['Option A', 'Option B', 'Option C', 'Option D'].map((o, i) => <option key={i} value={i}>{o}</option>)}
+                  </select>
+                </div>
+                <button type="submit" disabled={qLoading}
+                  className="w-full py-3 rounded-xl font-semibold text-white disabled:opacity-50 transition-all"
+                  style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#f59e0b', boxShadow: '0 2px 8px rgba(245,158,11,0.3)' }}>
+                  {qLoading ? 'Adding...' : '➕ Add Question'}
+                </button>
+              </form>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white">Custom Questions ({questions.length})</h3>
+                <button onClick={fetchQuestions} className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                  style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#f59e0b20', color: '#f59e0b' }}>🔄 Refresh</button>
+              </div>
+              {qLoading ? (
+                <div className="flex justify-center py-8"><svg className="animate-spin h-6 w-6 text-yellow-500" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg></div>
+              ) : questions.length === 0 ? (
+                <div className="flex flex-col items-center py-10 gap-2 text-gray-400">
+                  <span style={{ fontSize: 36 }}>❓</span>
+                  <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }}>No custom questions yet</p>
+                  <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-300 text-center">Use the form on the left to add questions</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                  {questions.map(q => (
+                    <div key={q.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 group">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs px-2 py-0.5 rounded-md font-medium"
+                          style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#f59e0b20', color: '#f59e0b' }}>{q.section}</span>
+                        <button onClick={() => handleDeleteQuestion(q.id)}
+                          className="opacity-0 group-hover:opacity-100 text-xs px-2 py-1 rounded-lg text-red-500 transition-all"
+                          style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#ef444415' }}>Delete</button>
+                      </div>
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, fontWeight: 500, lineHeight: 1.5 }} className="text-gray-900 dark:text-white mb-2">{q.question}</p>
+                      <div className="grid grid-cols-2 gap-1">
+                        {q.options.map((opt, j) => (
+                          <p key={j} style={{ fontFamily: 'Inter,sans-serif', fontSize: 11 }}
+                            className={j === q.answer ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-400'}>
+                            {String.fromCharCode(65 + j)}) {opt}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* ANNOUNCE */}
+        {activeTab === 'announce' && (
+          <div className="max-w-2xl space-y-5 mx-auto">
+            <Card className="p-6">
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white mb-2">📢 Send Platform Announcement</h3>
+              <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }} className="text-gray-500 dark:text-gray-400 mb-6">
+                Notify all {students.length} students via their notification bell.
+              </p>
+              {annResult && (
+                <div className={`mb-5 px-4 py-3 rounded-xl text-sm ${annResult.includes('Sent') ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}
+                  style={{ fontFamily: 'Inter,sans-serif' }}>{annResult}</div>
+              )}
+              <form onSubmit={handleAnnounce} className="space-y-4">
+                <div>
+                  <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Title</label>
+                  <input type="text" value={annTitle} onChange={e => setAnnTitle(e.target.value)} required placeholder="e.g. New Mock Interview Topics Added!"
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500"
+                    style={{ fontFamily: 'Inter,sans-serif' }} />
+                </div>
+                <div>
+                  <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Message</label>
+                  <textarea value={annMsg} onChange={e => setAnnMsg(e.target.value)} required rows={5} placeholder="Type your message to all students..."
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500 resize-none"
+                    style={{ fontFamily: 'Inter,sans-serif' }} />
+                </div>
+                <button type="submit" disabled={annLoading}
+                  className="w-full py-3 rounded-xl font-semibold text-white disabled:opacity-50 transition-all"
+                  style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#22c55e', boxShadow: '0 2px 8px rgba(34,197,94,0.3)' }}>
+                  {annLoading ? 'Sending...' : `📢 Send to All ${students.length} Students`}
+                </button>
+              </form>
+            </Card>
+            <Card className="p-5">
+              <h4 style={{ fontFamily: 'Sora,sans-serif', fontSize: 14, fontWeight: 600 }} className="text-gray-700 dark:text-gray-300 mb-3">💡 Tips</h4>
+              <ul className="space-y-2">
+                {[
+                  'Use clear titles that grab student attention',
+                  'Keep messages focused and actionable',
+                  'Announce new features, upcoming assessments, or important updates',
+                  'Notifications appear instantly in the student notification bell',
+                ].map((tip, i) => (
+                  <li key={i} style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }} className="flex gap-2 text-gray-500 dark:text-gray-400">
+                    <span className="text-green-500 flex-shrink-0">•</span>{tip}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }

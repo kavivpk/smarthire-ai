@@ -196,7 +196,7 @@ def get_student_detail(student_id: int, db: Session = Depends(get_db), current_a
 
 @router.post("/questions/aptitude")
 def add_aptitude_question(req: AddAptitudeRequest, db: Session = Depends(get_db), current_admin: dict = Depends(require_admin)):
-    if req.section not in ["Analytical", "Logical", "Technical", "General"]:
+    if req.section not in ["Analytical", "Logical", "Technical", "General", "Verbal", "Quantitative"]:
         raise HTTPException(status_code=400, detail="Invalid section name")
     
     if len(req.options) != 4:

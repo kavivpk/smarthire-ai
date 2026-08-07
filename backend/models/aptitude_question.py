@@ -9,7 +9,7 @@ class AptitudeQuestion(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     section = Column(
-        Enum("Analytical", "Logical", "Technical", "General"),
+        Enum("Analytical", "Logical", "Technical", "General", "Verbal", "Quantitative"),
         default="General",
         nullable=False,
     )

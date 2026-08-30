@@ -49,10 +49,10 @@ def notify(
 
     # Schedule as a background task using asyncio
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(_run())
-        else:
-            loop.run_until_complete(_run())
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_run())
+        except RuntimeError:
+            asyncio.run(_run())
     except Exception as e:
         logger.error(f"[NotificationService] Failed to schedule: {e}")

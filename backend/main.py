@@ -2,6 +2,7 @@
 main.py — FastAPI server + Socket.io (ASGI) entry point (replaces server.js)
 """
 import os
+from datetime import datetime
 import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

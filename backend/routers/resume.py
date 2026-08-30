@@ -61,10 +61,10 @@ Return ONLY this JSON (no markdown, no explanation):
                     "Authorization": f"Bearer {GROQ_API_KEY}"
                 },
                 json={
-                    "model": "llama-3.3-70b-versatile",
+                    "model": "openai/gpt-oss-120b",
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.3,
-                    "max_tokens": 800
+                    "max_tokens": 1500
                 }
             )
 

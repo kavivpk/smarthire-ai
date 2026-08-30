@@ -67,7 +67,7 @@ Respond ONLY with a valid JSON array (no markdown block, no explanation, no ```j
             "Authorization": f"Bearer {GROQ_API_KEY}"
         }
         body = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "openai/gpt-oss-120b",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.3,
             "max_tokens": 6000

@@ -944,26 +944,26 @@ export default function LiveInterview() {
 
         {/* ── HR / Admin Interview ── */}
         {mainMode === 'admin' && (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-5">
-            <h2 className="text-white font-semibold text-lg">HR Live Interview Room</h2>
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 space-y-5">
+            <h2 className="text-gray-900 dark:text-white font-bold text-xl" style={{ fontFamily: 'Sora, sans-serif' }}>HR Live Interview Room</h2>
             <div>
-              <label className="text-gray-400 text-sm mb-1.5 block">Your Name</label>
+              <label className="text-gray-700 dark:text-gray-400 text-sm mb-1.5 block">Your Name</label>
               <input id="admin-name" type="text" value={userName} onChange={e => setUserName(e.target.value)}
                 placeholder="Enter your name"
-                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-500" />
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-500" />
             </div>
 
             {/* Role selector */}
             <div className="grid grid-cols-2 gap-3">
               {[
-                { id: 'student', label: ' Student / Candidate', desc: 'You are being interviewed' },
-                { id: 'admin', label: ' HR / Interviewer', desc: 'You are conducting the interview' },
+                { id: 'student', label: '🎓 Student / Candidate', desc: 'You are being interviewed' },
+                { id: 'admin', label: '👔 HR / Interviewer', desc: 'You are conducting the interview' },
               ].map(r => (
                 <button key={r.id} id={`role-${r.id}`} onClick={() => setRole(r.id)}
                   className="p-4 rounded-xl border text-left text-sm transition-all"
-                  style={{ borderColor: role === r.id ? '#ef4444' : '#374151', background: role === r.id ? '#ef444415' : '#111827' }}>
-                  <div className="font-medium text-white">{r.label}</div>
-                  <div className="text-gray-500 text-xs mt-1">{r.desc}</div>
+                  style={{ borderColor: role === r.id ? '#ef4444' : (isDark ? '#374151' : '#e5e7eb'), background: role === r.id ? 'rgba(239,68,68,0.08)' : (isDark ? '#111827' : '#f9fafb') }}>
+                  <div className="font-semibold text-gray-900 dark:text-white">{r.label}</div>
+                  <div className="text-gray-500 dark:text-gray-400 text-xs mt-1">{r.desc}</div>
                 </button>
               ))}
             </div>
@@ -974,14 +974,14 @@ export default function LiveInterview() {
               <button id="btn-create-room" onClick={handleCreateRoom}
                 className="py-3 rounded-xl font-semibold text-white text-sm transition-all"
                 style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
-                 Create Room
+                🚀 Create Room
               </button>
               <div className="flex gap-2">
                 <input id="join-room-input" type="text" value={joinRoomId} onChange={e => setJoinRoomId(e.target.value.toUpperCase())}
                   placeholder="ROOM-XXXXXX"
-                  className="flex-1 bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-3 text-xs focus:outline-none focus:border-red-500" />
+                  className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-3 py-3 text-xs focus:outline-none focus:border-red-500" />
                 <button id="btn-join-room" onClick={handleJoinRoom}
-                  className="px-4 py-3 rounded-xl font-semibold text-white text-sm bg-gray-700 hover:bg-gray-600 transition-all">
+                  className="px-5 py-3 rounded-xl font-semibold text-gray-700 dark:text-white text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all border border-gray-300 dark:border-transparent">
                   Join
                 </button>
               </div>

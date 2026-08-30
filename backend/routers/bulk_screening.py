@@ -2,6 +2,7 @@
 routers/bulk_screening.py — Bulk screening routes (replaces routes/bulkScreeningRoutes.js)
 """
 import os
+import io
 import shutil
 import pdfplumber
 from typing import List
@@ -12,10 +13,6 @@ from middleware.auth import get_current_user
 from services.ats_scoring import score_resume_text, IMPORTANT_SKILLS
 
 router = APIRouter(prefix="/api/bulk-screening", tags=["bulk-screening"])
-
-UPLOADS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
-if not os.path.exists(UPLOADS_DIR):
-    os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 
 def parse_requirements(requirements_text: str) -> List[str]:
@@ -63,19 +60,23 @@ async def analyze_bulk(
             })
             continue
 
-        temp_path = os.path.join(UPLOADS_DIR, f"bulk-{current_user['id']}-{file.filename}")
-        with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
         try:
+            content = await file.read()
+            if not content:
+                results.append({
+                    "fileName": file.filename,
+                    "error": "File is empty"
+                })
+                continue
+
             extracted_text = ""
-            with pdfplumber.open(temp_path) as pdf:
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
                 for page in pdf.pages:
                     text = page.extract_text()
                     if text:
                         extracted_text += text + "\n"
 
-            if not extracted_text:
+            if not extracted_text.strip():
                 results.append({
                     "fileName": file.filename,
                     "error": "Could not extract text from this file"
@@ -93,14 +94,11 @@ async def analyze_bulk(
                 "textPreview": extracted_text[:200]
             })
 
-        except Exception:
+        except Exception as e:
             results.append({
                 "fileName": file.filename,
-                "error": "Could not parse this file"
+                "error": f"Could not parse this file: {str(e)}"
             })
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
 
     # Sort by atsScore descending
     results.sort(key=lambda x: x.get("atsScore", 0), reverse=True)

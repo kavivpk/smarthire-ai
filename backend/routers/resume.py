@@ -2,6 +2,7 @@
 routers/resume.py — Resume analysis routes (replaces routes/resumeRoutes.js and controllers/resumeController.js)
 """
 import os
+import io
 import shutil
 import httpx
 import json
@@ -124,21 +125,20 @@ async def analyze_resume(
     if not resume.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="PDF files only!")
 
-    # Save temp file
-    temp_path = os.path.join(UPLOADS_DIR, f"{current_user['id']}-{resume.filename}")
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(resume.file, buffer)
+    content = await resume.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty PDF file uploaded")
 
     try:
         extracted_text = ""
-        with pdfplumber.open(temp_path) as pdf:
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
                 if text:
                     extracted_text += text + "\n"
 
-        if not extracted_text:
-            raise HTTPException(status_code=400, detail="Could not extract text from PDF")
+        if not extracted_text.strip():
+            raise HTTPException(status_code=400, detail="Could not extract text from PDF. Ensure the PDF contains selectable text, not scanned images.")
 
         extracted_text_lower = extracted_text.lower()
 
@@ -153,7 +153,7 @@ async def analyze_resume(
         res_db = Resume(
             user_id=current_user["id"],
             file_name=resume.filename,
-            extracted_text=extracted_text[:500], # store preview or first 500 chars to match Node.js
+            extracted_text=extracted_text[:500],
             ats_score=ats_score,
             matched_skills=matched_skills,
             missing_skills=missing_skills[:8],
@@ -162,10 +162,6 @@ async def analyze_resume(
         db.add(res_db)
         db.commit()
         db.refresh(res_db)
-
-        # Remove temp file
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
 
         # Run AI Deep analysis in background
         from database import SessionLocal

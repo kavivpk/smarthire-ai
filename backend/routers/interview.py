@@ -797,8 +797,8 @@ For each test case:
                 json={
                     "model": "llama-3.3-70b-versatile",
                     "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.3,
-                    "max_tokens": 600
+                    "temperature": 0.1,
+                    "max_tokens": 2048
                 }
             )
 
@@ -807,20 +807,39 @@ For each test case:
 
             groq_data = res.json()
             raw = groq_data["choices"][0]["message"]["content"].strip()
-            if raw.startswith("```"):
-                raw = raw.replace("```json", "").replace("```", "").strip()
+            # Strip markdown code fences
+            import re as _re
+            raw = _re.sub(r'^```json\s*', '', raw, flags=_re.IGNORECASE)
+            raw = _re.sub(r'^```\s*', '', raw)
+            raw = _re.sub(r'```\s*$', '', raw).strip()
 
+            # Attempt to extract the first complete JSON object if Groq adds trailing text
             try:
                 evaluation = json.loads(raw)
             except Exception:
-                evaluation = {
-                    "score": 5,
-                    "verdict": "Reviewed",
-                    "testCases": [{"input": tc.get("input"), "expected": tc.get("expected"), "actual": "N/A", "status": "Pass"} for tc in (req.testCases or [])],
-                    "feedback": raw,
-                    "hints": "",
-                    "timeComplexity": "N/A"
-                }
+                # Try extracting just the JSON object portion
+                json_match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+                if json_match:
+                    try:
+                        evaluation = json.loads(json_match.group())
+                    except Exception:
+                        evaluation = {
+                            "score": 5,
+                            "verdict": "Partial",
+                            "testCases": [{"input": tc.get("input"), "expected": tc.get("expected"), "actual": "N/A", "status": "Pass"} for tc in (req.testCases or [])],
+                            "feedback": raw[:500],
+                            "hints": "",
+                            "timeComplexity": "N/A"
+                        }
+                else:
+                    evaluation = {
+                        "score": 5,
+                        "verdict": "Reviewed",
+                        "testCases": [{"input": tc.get("input"), "expected": tc.get("expected"), "actual": "N/A", "status": "Pass"} for tc in (req.testCases or [])],
+                        "feedback": raw[:500],
+                        "hints": "",
+                        "timeComplexity": "N/A"
+                    }
 
         # Persist report if not just dry run
         if not run_only:
@@ -880,8 +899,19 @@ For each test case:
                 )
 
         return evaluation
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[evaluate-code] Unexpected error: {e}")
+        # Return a safe fallback so the frontend doesn't show a generic error
+        return {
+            "score": 0,
+            "verdict": "Error",
+            "testCases": [{"input": tc.get("input", ""), "expected": tc.get("expected", ""), "actual": "Execution error", "status": "Fail"} for tc in (req.testCases or [])],
+            "feedback": f"Code evaluation encountered an error: {str(e)}",
+            "hints": "Check your syntax and try again.",
+            "timeComplexity": "N/A"
+        }
 
 
 @router.post("/evaluate")

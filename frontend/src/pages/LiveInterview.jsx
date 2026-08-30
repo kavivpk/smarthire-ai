@@ -358,8 +358,11 @@ export default function LiveInterview() {
         testCases: prob.testCases
       });
       setRunResult(res.data);
+      setConsoleTab('result');
     } catch (err) {
-      setError('Code execution failed. Check backend connection.');
+      const detail = err.response?.data?.detail || err.message || 'Unknown error';
+      setError(`Code execution failed: ${detail}`);
+      setConsoleTab('console');
     } finally {
       setCodeRunning(false);
     }
@@ -382,8 +385,9 @@ export default function LiveInterview() {
       const evalData = res.data;
       setCodingEval(evalData);
       setCodingResults(prev => [...prev, { problemId: prob.id, title: prob.title, ...evalData }]);
-    } catch {
-      setError('Code evaluation failed. Check backend & GROQ_API_KEY.');
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.message || 'Unknown error';
+      setError(`Code evaluation failed: ${detail}`);
     } finally {
       setCodingSubmitting(false);
     }
@@ -1924,9 +1928,19 @@ export default function LiveInterview() {
                             </div>
                           )}
                         </div>
+                      ) : error ? (
+                        <div className="py-6 px-4">
+                          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-red-400 text-sm font-bold">⚠ Execution Failed</span>
+                            </div>
+                            <pre className="text-red-300 text-xs font-mono whitespace-pre-wrap break-all">{error}</pre>
+                            <p className="text-gray-500 text-xs">Check that the backend is running and the GROQ API key is configured correctly.</p>
+                          </div>
+                        </div>
                       ) : (
                         <div className="text-center py-8 text-xs text-gray-500 font-mono">
-                          Click "Run Code" to run the default test cases.
+                          Click &quot;Run Code&quot; to run the default test cases.
                         </div>
                       )}
                     </div>

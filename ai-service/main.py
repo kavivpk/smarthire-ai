@@ -20,5 +20,7 @@ app.include_router(aptitude.router, prefix="/api/aptitude", tags=["Aptitude"])
 app.include_router(interview_agent.router, prefix="/api/agents/interview", tags=["Interview Agent"])
 
 @app.get("/")
+@app.get("/health")
+@app.get("/api/health")
 def root():
-    return {"message": "SmartHire AI Service running!", "version": "1.0.0"}
+    return {"status": "ok", "message": "SmartHire AI Service running!", "version": "1.0.0"}

@@ -70,7 +70,7 @@ Respond ONLY with a valid JSON array (no markdown block, no explanation, no ```j
             "model": "openai/gpt-oss-120b",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.3,
-            "max_tokens": 6000
+            "max_tokens": 4096
         }
 
         response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=body)

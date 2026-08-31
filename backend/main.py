@@ -68,8 +68,10 @@ app.include_router(bulk_screening.router)
 
 
 @app.get("/")
+@app.get("/health")
+@app.get("/api/health")
 def read_root():
-    return {"message": "SmartHire AI Backend running!"}
+    return {"status": "ok", "message": "SmartHire AI Backend running!", "timestamp": datetime.utcnow().isoformat()}
 
 
 # ── Socket.io Setup ──────────────────────────────────────────────────────────

@@ -17,6 +17,21 @@ from models.interview import Interview
 from models.aptitude_question import AptitudeQuestion
 from pydantic import BaseModel
 
+try:
+    import pdfplumber  # type: ignore
+except ImportError:
+    pdfplumber = None
+
+try:
+    import docx  # type: ignore
+except ImportError:
+    docx = None
+
+try:
+    from groq import Groq  # type: ignore
+except ImportError:
+    Groq = None
+
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 class AddAptitudeRequest(BaseModel):
@@ -232,16 +247,18 @@ def _extract_text_from_file(content: bytes, filename: str) -> str:
     """Extract plain text from PDF, DOCX, or TXT file bytes."""
     ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else "txt"
     if ext == "pdf":
+        if not pdfplumber:
+            raise HTTPException(status_code=500, detail="pdfplumber module is not available")
         try:
-            import pdfplumber
             with pdfplumber.open(io.BytesIO(content)) as pdf:
                 return "\n".join(page.extract_text() or "" for page in pdf.pages)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to read PDF: {e}")
     elif ext in ("docx", "doc"):
+        if not docx:
+            raise HTTPException(status_code=500, detail="python-docx module is not available")
         try:
-            from docx import Document
-            doc = Document(io.BytesIO(content))
+            doc = docx.Document(io.BytesIO(content))
             return "\n".join(p.text for p in doc.paragraphs)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to read DOCX: {e}")
@@ -288,7 +305,8 @@ async def import_questions_from_file(
     raw_text = raw_text[:12000]
 
     # Use Groq LLM to parse questions
-    from groq import Groq
+    if not Groq:
+        raise HTTPException(status_code=500, detail="groq library is not installed")
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     prompt = f"""You are a question parser. Extract ALL multiple-choice questions from the text below.

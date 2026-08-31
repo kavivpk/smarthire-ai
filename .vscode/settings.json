@@ -13,7 +13,18 @@
     "e:\\Project\\smarthire-ai\\ai-service\\venv\\Lib\\site-packages"
   ],
   "python.analysis.autoImportCompletions": true,
-  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.diagnosticMode": "openFilesOnly",
+  "pyrefly.pythonInterpreter": "e:\\Project\\smarthire-ai\\backend\\venv\\Scripts\\python.exe",
+  "pyrefly.enable": false,
+  "pyrefly.diagnostics.enable": false,
+  "pyrefly.ignoredFiles": [
+    "**/_pyrefly_virtual_/**",
+    "**/*.inmemory",
+    "*_pyrefly_virtual_*"
+  ],
+  "files.exclude": {
+    "**/_pyrefly_virtual_/**": true
+  },
   "[python]": {
     "editor.defaultFormatter": null
   },

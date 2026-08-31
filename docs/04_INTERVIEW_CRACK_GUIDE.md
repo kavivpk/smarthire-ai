@@ -102,6 +102,20 @@ By reading files as byte arrays into `io.BytesIO` and streaming directly to `pdf
 2. An LLM agent parses each claimed skill and scans the candidate's project descriptions for authentic implementation evidence (e.g., tools used, metrics achieved, architecture described).
 3. Claims with zero project backing are classified as **High Severity Exaggerations**, helping recruiters filter out buzzword-stuffed resumes."
 
+#### Q10: How does the Admin Bulk Question Document Ingestion Pipeline work?
+**Answer:**  
+"Administrators can upload question banks in **PDF, DOCX, DOC, or TXT** formats.
+1. The backend receives the file as an in-memory byte buffer (`UploadFile`).
+2. Dispatches to the appropriate parser (`pdfplumber` or `python-docx`) without writing to disk.
+3. Feeds raw extracted text to Groq (`openai/gpt-oss-120b`) with a zero-shot structured prompt.
+4. The LLM extracts questions, choices A/B/C/D, and normalizes the correct answer into a 0-indexed integer (`0=A, 1=B, 2=C, 3=D`).
+5. Executes a single transactional bulk insert into MySQL/SQLite, assigning questions to sections (`Analytical`, `Logical`, `Technical`, etc.)."
+
+#### Q11: How did you solve the input focus-loss bug caused by React component identity re-creation?
+**Answer:**  
+"When defining sub-components inside the render function of a parent component (e.g. `const Card = ...` declared inside `AdminDashboard()`), JavaScript recreates a new component function reference on every single state change or keystroke. During reconciliation, React detects `PrevCard !== NewCard` and unmounts the old DOM subtree, completely destroying input focus after every keystroke.  
+By moving the component definition to **module scope** outside the render body, React preserves component identity across re-renders, guaranteeing smooth typing performance."
+
 ---
 
 ## 3. Key Architectural Trade-Offs (Pros vs. Cons)
@@ -112,3 +126,4 @@ By reading files as byte arrays into `io.BytesIO` and streaming directly to `pdf
 | **In-Memory PDF Parsing (`io.BytesIO`)** | Blazing fast, no disk writes, zero file-locking bugs. | Memory consumption scales with file size. | Restricted upload size to 5MB per resume in frontend and API layer. |
 | **Client-Side Proctoring** | Low server bandwidth, zero cloud compute costs, candidate privacy preserved. | Advanced users with multiple monitors could attempt workarounds. | Combined with mandatory fullscreen lock, blur detection, and multi-round verification. |
 | **Dynamic SQLite/MySQL Failover** | 100% development and demo uptime; zero crash on DB down. | SQLite does not support high-concurrency writes in enterprise production. | Used purely as a safety failover fallback; production environment utilizes MySQL connection pooling. |
+| **Document MCQ Parsing via LLM** | Ingests non-standard question formats (tables, raw paragraphs, numbered lists) effortlessly. | Requires API key & network roundtrip to LLM inference service. | Truncates text to 12,000 chars, uses low temperature 0.1 and fast LPU inference under 1.5 seconds. |

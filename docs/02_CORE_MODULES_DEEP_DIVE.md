@@ -114,3 +114,20 @@ Implemented in [`email_service.py`](file:///e:/Project/smarthire-ai/backend/serv
   - Grand Total & Percentile Score.
   - Section-by-section breakdown (Aptitude categories, Coding problem scores, Technical voice metrics).
   - Proctoring violation audit summary.
+
+---
+
+## 8. 🛠️ Admin Intelligence & Bulk Question Import Pipeline
+
+Implemented in [`backend/routers/admin.py`](file:///e:/Project/smarthire-ai/backend/routers/admin.py) and [`AdminDashboard.jsx`](file:///e:/Project/smarthire-ai/frontend/src/pages/AdminDashboard.jsx):
+
+- **Drag-and-Drop Document Ingestion:**
+  - Administrators can drag and drop curriculum or question bank files in **PDF, DOCX, DOC, or TXT** formats.
+  - In-memory parsing using `pdfplumber` and `python-docx` eliminates temporary file locks.
+- **LLM-Powered Question Normalization (`openai/gpt-oss-120b`):**
+  - Unstructured documents (numbered lists, tables, raw paragraphs) are parsed and normalized into structured 4-option MCQs with validated zero-indexed answer keys (`A=0, B=1, C=2, D=3`).
+  - Batch transaction insertion into the SQL database with section assignment (`Analytical`, `Technical`, `Logical`, `Verbal`, `Quantitative`, `General`).
+- **Platform Analytics & Broadcast Broadcasts:**
+  - Real-time aggregation of student scores, registration timelines, and ATS score distributions.
+  - Broadcast notifications dispatched directly into candidate notification bells via `notify()` service.
+

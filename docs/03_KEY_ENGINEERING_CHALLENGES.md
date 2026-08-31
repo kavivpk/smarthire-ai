@@ -129,3 +129,70 @@ In the combined 3-stage interview flow, `submitAptitude` had a `skipEmail: true`
 1. Decoupled the round-level result dispatch from the combined session saver.
 2. Removed `skipEmail` constraints from both backend `submitAptitude` and frontend `LiveInterview.jsx`.
 3. Candidate receives their section score report **immediately upon round completion**, plus an optional full transcript report upon completing the entire interview.
+
+---
+
+## 5. React Component Identity & Input Focus Loss Bug
+
+### 🛑 The Problem
+In the Admin Dashboard (`AdminDashboard.jsx`), whenever the admin typed in any form input (such as Announcement Title or Message), typing **a single character caused the cursor to lose focus**, requiring the user to click into the input box again for every single letter.
+
+### 🔍 Root Cause Analysis
+- A reusable UI wrapper component `const Card = ({ children }) => ...` was declared **inside the body of the `AdminDashboard()` component function**.
+- In React's reconciliation algorithm, when state changes (`setAnnTitle(e.target.value)`), `AdminDashboard` re-renders.
+- Because `Card` was defined inside the render function, JavaScript created a **brand-new function reference for `Card`** on every render.
+- React compares previous component types with new component types: `PrevCard !== NewCard`.
+- As a result, React **unmounted the entire previous DOM subtree** (including the `<input>` element) and mounted a fresh one, destroying the active focus state!
+
+### 💡 The Engineering Solution
+Moved the `Card` component definition to **module scope** (outside `AdminDashboard()`):
+
+```javascript
+// ✅ Correct: Defined once at module scope — stable reference across re-renders
+const Card = ({ children, className = '' }) => (
+  <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl ${className}`}>
+    {children}
+  </div>
+);
+
+export default function AdminDashboard() {
+  // State changes here no longer recreate Card component identity
+  const [annTitle, setAnnTitle] = useState('');
+  ...
+}
+```
+
+---
+
+## 6. Asynchronous Background Tasks & Request-Scoped DB Session Lifetime
+
+### 🛑 The Problem
+When a student logged in (`POST /api/auth/login`), an async fire-and-forget task was dispatched to query the user's historical test scores and email a summary. Intermittently, the server logged `sqlalchemy.orm.exc.DetachedInstanceError` or `InterfaceError: connection closed`.
+
+### 🔍 Root Cause Analysis
+FastAPI dependency injection `db: Session = Depends(get_db)` provides a request-scoped database session that automatically closes when the HTTP endpoint returns a response (`finally: db.close()`). The background coroutine `asyncio.ensure_future(send_summary())` was attempting to execute SQL queries using this already-closed request session.
+
+### 💡 The Engineering Solution
+Decoupled the background task by having it instantiate its own dedicated, isolated `SessionLocal()`:
+
+```python
+# backend/routers/auth.py
+if user.role == "student":
+    user_id = user.id
+    user_email = user.email
+    user_name = user.name
+
+    async def send_summary():
+        try:
+            # Independent session created, used, and cleanly closed in background context
+            with SessionLocal() as db_session:
+                coding = db_session.query(CodingReport).filter(CodingReport.user_id == user_id).all()
+                technical = db_session.query(InterviewReport).filter(InterviewReport.user_id == user_id).all()
+                ...
+                send_login_summary(user_email, user_name, scores_dict)
+        except Exception as err:
+            logger.error(f"Failed to send login summary: {err}")
+
+    asyncio.ensure_future(send_summary())
+```
+

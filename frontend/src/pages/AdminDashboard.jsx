@@ -13,6 +13,17 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointEleme
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// Card must be defined at module scope — NOT inside AdminDashboard.
+// If defined inside the component, React recreates a new function reference
+// on every render (every keystroke), which causes inputs inside Card to lose
+// focus because React sees a "different" component and unmounts+remounts it.
+const Card = ({ children, className = '' }) => (
+  <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl ${className}`}
+    style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
+    {children}
+  </div>
+);
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -37,6 +48,14 @@ export default function AdminDashboard() {
   const [qText, setQText] = useState('');
   const [qOpts, setQOpts] = useState(['','','','']);
   const [qAns, setQAns] = useState(0);
+  const [showManualForm, setShowManualForm] = useState(false);
+
+  // File import state
+  const [importFile, setImportFile] = useState(null);
+  const [importSection, setImportSection] = useState('Analytical');
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
   
   const [annTitle, setAnnTitle] = useState('');
   const [annMsg, setAnnMsg] = useState('');
@@ -115,6 +134,37 @@ export default function AdminDashboard() {
       setQuestions(q => q.filter(x => x.id !== id));
     } catch (e) { alert('Delete failed'); }
   };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImportLoading(true); setImportResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', importFile);
+      fd.append('section', importSection);
+      const res = await API.post('/admin/questions/aptitude/import', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setImportResult({ success: true, message: res.data.message, count: res.data.imported });
+      setImportFile(null);
+      fetchQuestions();
+    } catch (err) {
+      setImportResult({ success: false, message: err.response?.data?.detail || 'Import failed' });
+    }
+    setImportLoading(false);
+  };
+
+  const handleFileDrop = (e) => {
+    e.preventDefault(); setDragOver(false);
+    const f = e.dataTransfer.files[0];
+    if (f) setImportFile(f);
+  };
+
+  const handleFilePick = (e) => {
+    const f = e.target.files[0];
+    if (f) setImportFile(f);
+  };
+
 
   const handleAnnounce = async (e) => {
     e.preventDefault();
@@ -202,12 +252,7 @@ export default function AdminDashboard() {
   const sc = s => s >= 7 ? '#22c55e' : s >= 4 ? '#f59e0b' : '#ef4444';
   const tabEmoji = { overview: '📊', students: '👥', analytics: '📈', interviews: '🎤', questions: '❓', announce: '📢' };
 
-  const Card = ({ children, className = '' }) => (
-    <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl ${className}`}
-      style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 8px 24px -12px rgba(0,0,0,0.2)' }}>
-      {children}
-    </div>
-  );
+  // Card is defined at module scope above — see top of file
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-950">
@@ -567,52 +612,163 @@ export default function AdminDashboard() {
         {/* QUESTIONS */}
         {activeTab === 'questions' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Card className="p-6">
-              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white mb-5">➕ Add Aptitude Question</h3>
-              {qMsg && (
-                <div className={`mb-4 px-4 py-2.5 rounded-xl text-sm ${qMsg.includes('success') ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}
-                  style={{ fontFamily: 'Inter,sans-serif' }}>{qMsg}</div>
-              )}
-              <form onSubmit={handleAddQuestion} className="space-y-4">
-                <div>
-                  <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Section</label>
-                  <select value={qSection} onChange={e => setQSection(e.target.value)}
+
+            {/* LEFT: Upload Card */}
+            <div className="space-y-4">
+              <Card className="p-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <span style={{ fontSize: 20 }}>📄</span>
+                  <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white">Import Questions from File</h3>
+                </div>
+                <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }} className="text-gray-500 dark:text-gray-400 mb-5">
+                  Upload a PDF, DOCX, DOC, or TXT file containing MCQ questions. AI will auto-parse and import them.
+                </p>
+
+                {/* Result Banner */}
+                {importResult && (
+                  <div className={`mb-4 px-4 py-3 rounded-xl text-sm flex items-center gap-2 ${importResult.success ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}
+                    style={{ fontFamily: 'Inter,sans-serif' }}>
+                    <span>{importResult.success ? '✅' : '❌'}</span>
+                    {importResult.message}
+                  </div>
+                )}
+
+                {/* Section Selector */}
+                <div className="mb-4">
+                  <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Assign to Section</label>
+                  <select value={importSection} onChange={e => setImportSection(e.target.value)}
                     className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-yellow-500"
                     style={{ fontFamily: 'Inter,sans-serif' }}>
-                    {['Analytical', 'Logical', 'Technical', 'Verbal', 'Quantitative'].map(s => <option key={s} value={s}>{s}</option>)}
+                    {['Analytical', 'Logical', 'Technical', 'Verbal', 'Quantitative', 'General'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Question</label>
-                  <textarea value={qText} onChange={e => setQText(e.target.value)} required rows={3} placeholder="Enter your question..."
-                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-yellow-500 resize-none"
-                    style={{ fontFamily: 'Inter,sans-serif' }} />
+
+                {/* Drag & Drop Zone */}
+                <div
+                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleFileDrop}
+                  onClick={() => document.getElementById('q-file-input').click()}
+                  className="cursor-pointer rounded-2xl border-2 border-dashed transition-all duration-200 flex flex-col items-center justify-center py-10 px-4 text-center"
+                  style={{
+                    borderColor: dragOver ? '#f59e0b' : importFile ? '#22c55e' : '#d1d5db',
+                    backgroundColor: dragOver ? '#f59e0b08' : importFile ? '#22c55e08' : 'transparent',
+                  }}>
+                  <input id="q-file-input" type="file" accept=".pdf,.docx,.doc,.txt" className="hidden" onChange={handleFilePick} />
+                  {importFile ? (
+                    <>
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style={{ backgroundColor: '#22c55e15' }}>
+                        <svg width="28" height="28" fill="none" stroke="#22c55e" strokeWidth="1.5" viewBox="0 0 24 24">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                      </div>
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 14, fontWeight: 600 }} className="text-green-600 dark:text-green-400 mb-1">{importFile.name}</p>
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-400">{(importFile.size / 1024).toFixed(1)} KB · Click to change file</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style={{ backgroundColor: '#f59e0b15' }}>
+                        <svg width="28" height="28" fill="none" stroke="#f59e0b" strokeWidth="1.5" viewBox="0 0 24 24">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                      </div>
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 14, fontWeight: 600 }} className="text-gray-700 dark:text-gray-300 mb-1">Drag & drop your file here</p>
+                      <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-400 mb-2">or click to browse</p>
+                      <div className="flex gap-2 flex-wrap justify-center">
+                        {['PDF', 'DOCX', 'DOC', 'TXT'].map(t => (
+                          <span key={t} className="px-2 py-0.5 rounded-md text-xs font-semibold"
+                            style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#f59e0b20', color: '#f59e0b' }}>{t}</span>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {['Option A', 'Option B', 'Option C', 'Option D'].map((label, i) => (
-                    <div key={i}>
-                      <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">{label}</label>
-                      <input type="text" value={qOpts[i]} onChange={e => { const o = [...qOpts]; o[i] = e.target.value; setQOpts(o); }} required placeholder={label}
-                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-500"
-                        style={{ fontFamily: 'Inter,sans-serif' }} />
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Correct Answer</label>
-                  <select value={qAns} onChange={e => setQAns(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-yellow-500"
-                    style={{ fontFamily: 'Inter,sans-serif' }}>
-                    {['Option A', 'Option B', 'Option C', 'Option D'].map((o, i) => <option key={i} value={i}>{o}</option>)}
-                  </select>
-                </div>
-                <button type="submit" disabled={qLoading}
-                  className="w-full py-3 rounded-xl font-semibold text-white disabled:opacity-50 transition-all"
-                  style={{ fontFamily: 'Inter,sans-serif', backgroundColor: '#f59e0b', boxShadow: '0 2px 8px rgba(245,158,11,0.3)' }}>
-                  {qLoading ? 'Adding...' : '➕ Add Question'}
+
+                {/* Import Button */}
+                <button
+                  onClick={handleImport}
+                  disabled={!importFile || importLoading}
+                  className="w-full mt-4 py-3 rounded-xl font-semibold text-white disabled:opacity-40 transition-all flex items-center justify-center gap-2"
+                  style={{ fontFamily: 'Inter,sans-serif', fontSize: 14, backgroundColor: '#f59e0b', boxShadow: importFile ? '0 2px 12px rgba(245,158,11,0.35)' : 'none' }}>
+                  {importLoading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      AI is parsing questions...
+                    </>
+                  ) : '🚀 Import Questions with AI'}
                 </button>
-              </form>
-            </Card>
+
+                <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 11 }} className="text-center text-gray-400 mt-3">
+                  AI will extract all MCQ questions, options, and answers automatically
+                </p>
+              </Card>
+
+              {/* Manual Entry Toggle */}
+              <Card className="p-4">
+                <button
+                  onClick={() => setShowManualForm(f => !f)}
+                  className="w-full flex items-center justify-between text-left"
+                >
+                  <span style={{ fontFamily: 'Sora,sans-serif', fontSize: 14, fontWeight: 600 }} className="text-gray-700 dark:text-gray-300">
+                    ✏️ Add Single Question Manually
+                  </span>
+                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+                    style={{ transform: showManualForm ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: '#9ca3af' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+
+                {showManualForm && (
+                  <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                    {qMsg && (
+                      <div className={`mb-4 px-4 py-2.5 rounded-xl text-sm ${qMsg.includes('success') ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}
+                        style={{ fontFamily: 'Inter,sans-serif' }}>{qMsg}</div>
+                    )}
+                    <form onSubmit={handleAddQuestion} className="space-y-3">
+                      <div>
+                        <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Section</label>
+                        <select value={qSection} onChange={e => setQSection(e.target.value)}
+                          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-yellow-500"
+                          style={{ fontFamily: 'Inter,sans-serif' }}>
+                          {['Analytical', 'Logical', 'Technical', 'Verbal', 'Quantitative'].map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Question</label>
+                        <textarea value={qText} onChange={e => setQText(e.target.value)} required rows={3} placeholder="Enter your question..."
+                          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-yellow-500 resize-none"
+                          style={{ fontFamily: 'Inter,sans-serif' }} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Option A', 'Option B', 'Option C', 'Option D'].map((label, i) => (
+                          <div key={i}>
+                            <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1">{label}</label>
+                            <input type="text" value={qOpts[i]} onChange={e => { const o = [...qOpts]; o[i] = e.target.value; setQOpts(o); }} required placeholder={label}
+                              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-500"
+                              style={{ fontFamily: 'Inter,sans-serif' }} />
+                          </div>
+                        ))}
+                      </div>
+                      <div>
+                        <label style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="text-gray-500 dark:text-gray-400 block mb-1.5">Correct Answer</label>
+                        <select value={qAns} onChange={e => setQAns(e.target.value)}
+                          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-yellow-500"
+                          style={{ fontFamily: 'Inter,sans-serif' }}>
+                          {['Option A', 'Option B', 'Option C', 'Option D'].map((o, i) => <option key={i} value={i}>{o}</option>)}
+                        </select>
+                      </div>
+                      <button type="submit" disabled={qLoading}
+                        className="w-full py-2.5 rounded-xl font-semibold text-white disabled:opacity-50 transition-all"
+                        style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, backgroundColor: '#f59e0b', boxShadow: '0 2px 8px rgba(245,158,11,0.3)' }}>
+                        {qLoading ? 'Adding...' : '➕ Add Question'}
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </Card>
+            </div>
+
+            {/* RIGHT: Question List */}
             <Card className="p-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 600 }} className="text-gray-900 dark:text-white">Custom Questions ({questions.length})</h3>
@@ -623,12 +779,12 @@ export default function AdminDashboard() {
                 <div className="flex justify-center py-8"><svg className="animate-spin h-6 w-6 text-yellow-500" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg></div>
               ) : questions.length === 0 ? (
                 <div className="flex flex-col items-center py-10 gap-2 text-gray-400">
-                  <span style={{ fontSize: 36 }}>❓</span>
-                  <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }}>No custom questions yet</p>
-                  <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-300 text-center">Use the form on the left to add questions</p>
+                  <span style={{ fontSize: 40 }}>📄</span>
+                  <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 13 }}>No questions yet</p>
+                  <p style={{ fontFamily: 'Inter,sans-serif', fontSize: 12 }} className="text-gray-300 text-center">Upload a PDF or DOCX to import questions in bulk</p>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                   {questions.map(q => (
                     <div key={q.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 group">
                       <div className="flex items-center justify-between mb-2">

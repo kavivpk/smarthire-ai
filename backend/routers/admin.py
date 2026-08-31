@@ -1,7 +1,11 @@
 """
 routers/admin.py — Admin routes (replaces routes/adminRoutes.js and controllers/adminController.js)
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import io
+import json
+import re
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from typing import List
@@ -222,6 +226,146 @@ def add_aptitude_question(req: AddAptitudeRequest, db: Session = Depends(get_db)
         "options": q.options,
         "answer": q.answer
     }}
+
+
+def _extract_text_from_file(content: bytes, filename: str) -> str:
+    """Extract plain text from PDF, DOCX, or TXT file bytes."""
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else "txt"
+    if ext == "pdf":
+        try:
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                return "\n".join(page.extract_text() or "" for page in pdf.pages)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to read PDF: {e}")
+    elif ext in ("docx", "doc"):
+        try:
+            from docx import Document
+            doc = Document(io.BytesIO(content))
+            return "\n".join(p.text for p in doc.paragraphs)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to read DOCX: {e}")
+    else:
+        # Plain text / CSV / any text format
+        try:
+            return content.decode("utf-8", errors="ignore")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to read file: {e}")
+
+
+@router.post("/questions/aptitude/import")
+async def import_questions_from_file(
+    file: UploadFile = File(...),
+    section: str = Form("Analytical"),
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(require_admin)
+):
+    """
+    Upload a PDF, DOCX, or TXT file containing aptitude MCQ questions.
+    The AI will parse them automatically and import into the database.
+    Expected MCQ format in document:
+      Q1. <question>
+      A) <opt>  B) <opt>  C) <opt>  D) <opt>
+      Answer: A
+    """
+    allowed_extensions = {"pdf", "docx", "doc", "txt"}
+    ext = file.filename.lower().rsplit(".", 1)[-1] if "." in file.filename else ""
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '.{ext}'. Use PDF, DOCX, DOC, or TXT."
+        )
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:  # 10 MB limit
+        raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+
+    raw_text = _extract_text_from_file(content, file.filename)
+    if not raw_text.strip():
+        raise HTTPException(status_code=400, detail="No text could be extracted from the file")
+
+    # Truncate to avoid token overflow
+    raw_text = raw_text[:12000]
+
+    # Use Groq LLM to parse questions
+    from groq import Groq
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+    prompt = f"""You are a question parser. Extract ALL multiple-choice questions from the text below.
+Return ONLY a valid JSON array (no markdown, no explanation) in this exact format:
+[
+  {{
+    "question": "Full question text here",
+    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+    "answer": 0
+  }}
+]
+- "answer" is the 0-based index of the correct option (0=A, 1=B, 2=C, 3=D)
+- If you cannot determine the answer, use 0
+- Only include questions with exactly 4 options
+- Remove question numbers from the question text
+
+TEXT TO PARSE:
+{raw_text}"""
+
+    try:
+        resp = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=4096,
+        )
+        raw_response = resp.choices[0].message.content.strip()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI parsing failed: {e}")
+
+    # Extract JSON array robustly
+    json_match = re.search(r"\[[\s\S]*\]", raw_response)
+    if not json_match:
+        raise HTTPException(status_code=422, detail="AI could not find any MCQ questions in the document")
+
+    try:
+        parsed_questions = json.loads(json_match.group())
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=422, detail=f"AI returned malformed JSON: {e}")
+
+    if not isinstance(parsed_questions, list) or len(parsed_questions) == 0:
+        raise HTTPException(status_code=422, detail="No questions found in document")
+
+    valid_sections = {"Analytical", "Logical", "Technical", "General", "Verbal", "Quantitative"}
+    if section not in valid_sections:
+        section = "Analytical"
+
+    imported = []
+    skipped = 0
+    for item in parsed_questions:
+        try:
+            q_text = str(item.get("question", "")).strip()
+            opts = item.get("options", [])
+            ans = int(item.get("answer", 0))
+
+            if not q_text or len(opts) != 4 or not (0 <= ans <= 3):
+                skipped += 1
+                continue
+
+            opts = [str(o).strip() for o in opts]
+            q = AptitudeQuestion(section=section, question=q_text, options=opts, answer=ans)
+            db.add(q)
+            db.flush()
+            imported.append({"id": q.id, "question": q_text})
+        except Exception:
+            skipped += 1
+            continue
+
+    db.commit()
+
+    return {
+        "message": f"Successfully imported {len(imported)} questions" + (f" ({skipped} skipped)" if skipped else ""),
+        "imported": len(imported),
+        "skipped": skipped,
+        "questions": imported
+    }
+
 
 
 @router.get("/all-interviews")

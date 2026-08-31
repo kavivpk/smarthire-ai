@@ -21,7 +21,8 @@ export default function Register() {
       const res = await API.post('/auth/register', formData);
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
-      navigate('/dashboard');
+      if (res.data.user.role === 'admin') navigate('/admin');
+      else navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.detail || err.response?.data?.message || 'Registration failed');
     } finally {

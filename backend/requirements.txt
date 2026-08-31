@@ -7,9 +7,11 @@ python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
 pdfplumber
+python-docx
 httpx
 python-dotenv
 python-socketio
 aiosmtplib
 email-validator
 bcrypt
+groq

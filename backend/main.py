@@ -3,7 +3,7 @@ main.py — FastAPI server + Socket.io (ASGI) entry point (replaces server.js)
 """
 import os
 from datetime import datetime
-import socketio
+import socketio  # type: ignore
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -37,16 +37,16 @@ load_dotenv()
 app = FastAPI(title="SmartHire AI Backend", version="1.0.0")
 
 # Setup CORS
-frontend_urls = os.getenv("FRONTEND_URL", "http://localhost:5173")
+frontend_urls = os.getenv("FRONTEND_URL", "http://localhost:5173,http://localhost:5174,http://localhost:5175")
 origins = [url.strip() for url in frontend_urls.split(",") if url.strip()]
-# Also add localhost wildcards or dynamic local origins to match Node.js dynamic CORS
-origins.append("http://localhost:5173")
-origins.append("http://localhost:5174")
-origins.append("http://localhost:5175")
+for loc in ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"]:
+    if loc not in origins:
+        origins.append(loc)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.railway\.app|https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -2,7 +2,7 @@
 routers/auth.py — Authentication routes (replaces routes/authRoutes.js and controllers/authController.js)
 """
 import os
-import bcrypt
+import bcrypt  # type: ignore
 import asyncio
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status

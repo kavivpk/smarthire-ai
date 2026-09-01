@@ -5,7 +5,7 @@ import os
 import bcrypt  # type: ignore
 import asyncio
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from jose import jwt
@@ -118,7 +118,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login(req: LoginRequest, db: Session = Depends(get_db)):
+def login(req: LoginRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email.lower()).first()
     if not user:
         raise HTTPException(status_code=400, detail="Invalid email or password")
@@ -136,14 +136,9 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         "name": user.name
     })
 
-    # Async send login summary email (fire-and-forget)
-    # Uses its own DB session so it doesn't rely on the closed request-scoped session
+    # Background send login summary email (fire-and-forget)
     if user.role == "student":
-        user_id = user.id
-        user_email = user.email
-        user_name = user.name
-
-        async def send_summary():
+        def send_summary(user_id: int, user_email: str, user_name: str):
             try:
                 with SessionLocal() as db_session:
                     coding = db_session.query(CodingReport).filter(CodingReport.user_id == user_id).all()
@@ -173,7 +168,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             except Exception as err:
                 print("Failed to send login summary email:", err)
 
-        asyncio.ensure_future(send_summary())
+        background_tasks.add_task(send_summary, user.id, user.email, user.name)
 
     return {
         "message": "Login successful",

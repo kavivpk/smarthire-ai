@@ -1,12 +1,20 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import resume, prediction, fake_skill, roadmap
 
 app = FastAPI(title="SmartHire AI Service", version="1.0.0")
 
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:5173"
+)
+
+origins = [url.strip() for url in FRONTEND_URL.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5000", "http://localhost:5173"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -19,4 +27,7 @@ app.include_router(roadmap.router, prefix="/api/roadmap", tags=["Roadmap"])
 
 @app.get("/")
 def root():
-    return {"message": "SmartHire AI Service running!", "version": "1.0.0"}
+    return {
+        "message": "SmartHire AI Service running!",
+        "version": "1.0.0"
+    }

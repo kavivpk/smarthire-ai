@@ -34,14 +34,20 @@ export default function Login() {
     try {
       const googleUser = await signInWithGoogle();
       const res = await API.post('/auth/google', {
-        email: googleUser.email, name: googleUser.displayName,
-        googleId: googleUser.uid, photoURL: googleUser.photoURL
+        email: googleUser.email,
+        name: googleUser.displayName,
+        googleId: googleUser.uid,
+        photoURL: googleUser.photoURL || null
       });
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       if (res.data.user.role === 'admin') navigate('/admin');
       else navigate('/dashboard');
-    } catch { setError('Google login failed. Try again.'); }
+    } catch (err) {
+      console.error('Google login error:', err);
+      const msg = err?.response?.data?.detail || err?.message || 'Google login failed. Try again.';
+      setError(msg);
+    }
   };
 
   const features = [
